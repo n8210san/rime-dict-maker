@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>字典整理器 v2.0 - 現代化架構</title>
+  <link rel="stylesheet" href="words.css" />
+  <style>
+    .module-status {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      z-index: 1000;
+    }
+    .module-status.ready { background: rgba(0,128,0,0.8); }
+    .module-status.loading { background: rgba(255,165,0,0.8); }
+    .module-status.error { background: rgba(255,0,0,0.8); }
+    
+    .text-count {
+      margin-top: 4px;
+      font-size: 12px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+    <div id="moduleStatus" class="module-status loading">載入中...</div>
+    
+    <h2>字典整理器 v2.0</h2>
+    <small><hr><a href="words_v2.html" target="word">斷詞整理器 v2.0</a><hr></small>
+
+    <div class="controls">
+        <button id="openFileBtn">開啟檔案</button>
+        <input type="file" id="openFileInput" accept=".txt,.md,.csv,.json,.log,.xml,.html,.htm,text/*" multiple style="display:none" />
+        
+        <div id="encodingContainer" style="display: inline-block; margin-left: 8px;"></div>
+        
+        排序字典檔計數範圍：
+        <input type="text" id="rangeInput" placeholder=">300 或 300-20 或 50-250" value=">2999" style="height: 40px; width: 180px; padding: 0 8px;" />
+        <button id="sortDictBtn">排序字典檔</button>
+        <button id="dedupeWithCommentsBtn">註解去重→Rime</button>
+        <button id="normalizeBtn">補完整字典</button>
+        <button id="quickBtn">速成</button>
+        <button id="fcjBtn">快倉</button>
+        
+        <label title="在輸出時加上原始計數" style="margin-left:8px; font-size:13px;">
+          <input type="checkbox" id="countOpt"> 計數
+        </label>
+        
+        <label title="選擇分隔符" style="margin-left:8px; font-size:13px;">分隔符:
+          <select id="separatorOpt" style="margin-left:4px;">
+            <option value="\t">tab</option>
+            <option value=" ">空格</option>
+          </select>
+        </label>
+        
+        <span id="dictMakerCharOptions" style="margin-left:8px;">輸出詞組字數：</span>
+        
+        <br style="clear:both;">
+        
+        <span class="fcj-options" style="margin-left:8px; font-size:13px; display:inline-flex; gap:10px; align-items:center;">
+          <label title="單字次數 > 1000 且為 3 碼時，另加一列左右碼">
+            <input type="checkbox" id="fcjOpt_freq1000_code3_to_code2" checked> 常用單字另加左右碼
+          </label>
+          <label title="常用單字加碼配套：2碼優先,3碼備用">(2碼優先,3碼備用)</label>
+          <label title="單字取碼：前2碼+後1碼（不超過原碼長度）">單字取碼 2+1</label>
+          <label title="多字詞：各字取左右碼後串接">詞: 左右碼拼接</label>
+        </span>
+        
+        <br>
+        <button id="nextStepBtn">←輸出轉輸入</button>
+        <button id="swapBtn">←互換→</button>
+        <button id="undoBtn">復原</button>
+        <button id="downloadBtn">下載結果</button>
+    </div>
+
+    <div id="textareaContainer"></div>
+    
+    <div id="statusContainer" style="margin: 12px 0;">
+      <div id="excuted_result" style="color: green;">字典整理器 v2.0 已就緒</div>
+    </div>
+
+<footer style="margin:24px 0 12px; padding-top:12px; border-top:1px solid #ddd; font-size:13px; color:#444; display:flex; gap:12px; align-items:flex-start;">
+  <div id="flowQuick" style="flex:1 1 0; padding:8px; border:1px solid #ccc; border-radius:6px;">
+    <strong>速成流程 v2.0</strong>
+    <ol style="margin:6px 0 0 18px;">
+      <li>現代化模組架構，統一編碼處理</li>
+      <li>智能錯誤處理和快取機制</li>
+      <li>配置自動保存和同步</li>
+    </ol>
+  </div>
+  <div id="flowFCJ" style="flex:1 1 0; padding:8px; border:1px solid #ccc; border-radius:6px;">
+    <strong>快倉流程 v2.0</strong>
+    <ol style="margin:6px 0 0 18px;">
+      <li>統一的字數過濾和UI管理</li>
+      <li>事件驅動的模組通信</li>
+      <li>完整的撤銷/重做系統</li>
+    </ol>
+  </div>
+</footer>
+
+<!-- 現代化模組系統 -->
+<script src="scripts/jquery-3.7.1.slim.min.js"></script>
+<script src="scripts/modules/core.js"></script>
+<script src="scripts/modules/config.js"></script>
+<script src="scripts/modules/cangjie.js"></script>
+<script src="scripts/modules/charFilter.js"></script>
+<script src="scripts/modules/ui.js"></script>
+<script src="scripts/modules/app.js"></script>
+
+<script>
+// 應用程式啟動器
+$(async function() {
+  const $status = $('#moduleStatus');
+  
+  try {
+    $status.text('載入模組系統...').removeClass().addClass('module-status loading');
+    
+    // 檢查模組系統是否可用
+    if (typeof ModuleSystem === 'undefined') {
+      throw new Error('ModuleSystem 未定義，請檢查 scripts/modules/core.js 是否載入成功');
+    }
+    
+    // 初始化模組系統
+    const result = await ModuleSystem.init([
+      'config', 'cangjie', 'charFilter', 'ui', 'app'
+    ]);
+    
+    if (result.failed.length > 0) {
+      const failedDetails = result.failed.map(f => `${f.name}: ${f.error.message}`).join('; ');
+      throw new Error(`模組載入失敗: ${failedDetails}`);
+    }
+    
+    // 獲取應用程式實例
+    const app = await ModuleSystem.get('app');
+    const ui = await ModuleSystem.get('ui');
+    
+    // 設置UI組件
+    ui.createEncodingSelect('#encodingContainer');
+    ui.createDualTextareas('#textareaContainer', {
+      inputPlaceholder: '請在此輸入字典...',
+      showCounts: true
+    });
+    
+    // 監聽應用程式事件
+    app.on('appReady', (data) => {
+      console.log('🎉 應用程式已就緒:', data);
+      $status.text('v2.0 已就緒').removeClass().addClass('module-status ready');
+    });
+    
+    app.on('statusUpdate', (data) => {
+      console.log('📊 狀態更新:', data);
+    });
+    
+    // 添加開發者工具
+    global.dev = {
+      getModuleStatus: () => ModuleSystem.status(),
+      getAppStatus: () => app.getAppStatus(),
+      reloadModule: (name) => ModuleSystem.core.reload(name),
+      getModule: (name) => ModuleSystem.get(name)
+    };
+    
+    console.log('🔧 開發者工具已載入，使用 dev.* 訪問');
+    
+  } catch (error) {
+    console.error('💥 應用程式啟動失敗:', error);
+    $status.text('載入失敗').removeClass().addClass('module-status error');
+    
+    // 顯示詳細錯誤信息
+    $status.append(`<br><small>錯誤: ${error.message}</small>`);
+    $status.append('<br><small>請檢查瀏覽器控制台以獲取詳細信息</small>');
+    $status.append('<br><small>5秒後將載入備用版本...</small>');
+    
+    // 延長等待時間，讓用戶看到錯誤信息
+    setTimeout(() => {
+      if (confirm('模組系統載入失敗。點擊確定載入傳統版本，點擊取消留在此頁面進行調試。')) {
+        window.location.href = 'dictMaker.html';
+      } else {
+        $status.text('已取消跳轉，請查看控制台進行調試').removeClass().addClass('module-status error');
+      }
+    }, 5000);
+  }
+});
+
+// 快捷鍵支援
+$(document).on('keydown', function(e) {
+  if (e.ctrlKey || e.metaKey) {
+    switch(e.key) {
+      case 'z':
+        e.preventDefault();
+        $('#undoBtn').click();
+        break;
+      case 's':
+        e.preventDefault();
+        $('#downloadBtn').click();
+        break;
+    }
+  }
+});
+</script>
+
+</body>
+</html>

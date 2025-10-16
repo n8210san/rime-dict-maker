@@ -47,8 +47,8 @@
         <button id="RimeBtn"> Rime 格式 {字 字 次} </button>
         <input type="number" id="rimeBaseInput" value="3" min="1" max="9999" style="width: 60px; height:40px; margin-left: 8px;" title="基數">
         <button id="freeCjBtn"> freeCj 格式 </button>
-        <span id="wordsCharOptions" style="margin-left: 8px;"></span>
-        <label style="margin-left: 8px;">
+        <span id="wordsCharOptions" style="margin-left: 8px;">輸出詞組字數：</span>
+        <label style="margin-left: 8px;" title="輸出限最多5碼字根 (for PIME快倉)">
           <input type="checkbox" id="freeCjLimit5Checkbox" checked> 限5碼
         </label>
         <button id="nextStepBtn">←輸出轉輸入</button>
@@ -86,6 +86,15 @@
   </div>
 </div>
 <script src="scripts/jquery-3.7.1.slim.min.js"> </script>
+<script src="scripts/configIntegration.js"></script>
+<script src="scripts/cangjieProcessor.js"></script>
+<script src="scripts/cangjieIntegration.js"></script>
+<script src="scripts/charFilterIntegration.js"></script>
+<script src="scripts/utils.js"></script>
+<script src="scripts/extracted_features.js"></script>
+<script src="scripts/rangeFilter.js"></script>
+<script src="scripts/dictMaker.js"></script>
+<script src="scripts/legacy_compatibility.js"></script>
 <!--
 Gemini 給的, 根本不能用
 <script src="https://unpkg.com/@node-modules/jieba@1.0.0/dist/jieba.min.js"></script>
@@ -108,10 +117,9 @@ words.js
 讓 require-jieba-js.js 自行載入 require.js 與 scripts/main.js，避免順序問題
 -->
 <script data="CDN 版本: 由 Rovodev 依本地專案給出的" Xsrc="https://pulipulichen.github.io/jieba-js/require-jieba-js.js"></script>
-<script data="本地執行 完全離線無牽掛" src="require-jieba-js.js"></script>
-<script src="scripts/utils.js"></script>
+<script data="本地執行 完全離線無牽掛" src="scripts/require-jieba-js.js"></script>
 <script src="html-lib/components/CharLengthOptions/CharLengthOptions.js"></script>
-<script src="words.js?"></script>
+<script src="scripts/words.js"></script>
 
 </body>
 </html>

@@ -99,6 +99,33 @@ function dedupWithTailNumber(arr) {
   );
 }
 
+// 為 words.html 提供統一的字數過濾器
+function getUnifiedCharLengthFilter() {
+  // 檢查是否有統一的字數選項組件
+  if (typeof CharLengthOptions !== 'undefined' && CharLengthOptions.getFilter) {
+    try {
+      return CharLengthOptions.getFilter();
+    } catch (e) {
+      console.warn('使用統一字數過濾器失敗，回退到舊邏輯:', e);
+    }
+  }
+  
+  // 回退邏輯：支援新的詳細字數選項
+  const checkBox = (id) => {
+    const $el = $(id);
+    return $el.length ? $el.is(':checked') : true;
+  };
+  
+  return function(charLength) {
+    if (charLength === 1) return checkBox('#freeCjSingleCharCheckbox');
+    if (charLength === 2) return checkBox('#freeCj2charCheckbox');
+    if (charLength === 3) return checkBox('#freeCj3charCheckbox');
+    if (charLength === 4) return checkBox('#freeCj4charCheckbox');
+    if (charLength >= 5) return checkBox('#freeCj5pluscharCheckbox');
+    return true; // 預設不受限
+  };
+}
+
 function prepare(returnType = '',regex = '') {
   let originalText = getSourceText();
   if (!originalText) return ''; // 空無目標早退
@@ -120,6 +147,23 @@ function prepare(returnType = '',regex = '') {
       // 簡易去重複
       prepared = [...new Set(arr_no_empty_wraplines)];
     }
+  }
+  
+  // 字數篩選邏輯：根據勾選的字數選項過濾結果
+  if (returnType.includes('charFilter') || returnType === 'dedup' || returnType === '[]') {
+    const charLengthFilter = getUnifiedCharLengthFilter();
+    prepared = prepared.filter(word => {
+      // 提取純中文字符長度（忽略行尾數字）
+      const cleanWord = word.replace(/\s+\d+$/, ''); // 移除行尾數字
+      const chineseLength = cleanWord.replace(/[^\u4e00-\u9fff]/g, '').length;
+      
+      // 如果沒有中文字符，保留（可能是英文詞彙）
+      if (chineseLength === 0) {
+        return charLengthFilter(cleanWord.length);
+      }
+      
+      return charLengthFilter(chineseLength);
+    });
   }
   
   if (returnType.includes('[]')) return prepared;
@@ -372,32 +416,6 @@ $(() => {
     };
   }
   
-  // 為 words.html 提供統一的字數過濾器
-  function getUnifiedCharLengthFilter() {
-    // 檢查是否有統一的字數選項組件
-    if (typeof CharLengthOptions !== 'undefined' && CharLengthOptions.getFilter) {
-      try {
-        return CharLengthOptions.getFilter();
-      } catch (e) {
-        console.warn('使用統一字數過濾器失敗，回退到舊邏輯:', e);
-      }
-    }
-    
-    // 回退邏輯：支援新的詳細字數選項
-    const checkBox = (id) => {
-      const $el = $(id);
-      return $el.length ? $el.is(':checked') : true;
-    };
-    
-    return function(charLength) {
-      if (charLength === 1) return checkBox('#freeCjSingleCharCheckbox');
-      if (charLength === 2) return checkBox('#freeCj2charCheckbox');
-      if (charLength === 3) return checkBox('#freeCj3charCheckbox');
-      if (charLength === 4) return checkBox('#freeCj4charCheckbox');
-      if (charLength >= 5) return checkBox('#freeCj5pluscharCheckbox');
-      return true; // 預設不受限
-    };
-  }
   function validateFreeCjCheckboxes() {
     // 檢查是否至少有一個字數選項被勾選
     const hasAnyChecked = [

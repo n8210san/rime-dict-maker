@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>v2.0 系統調試工具</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+    .success { color: green; }
+    .error { color: red; }
+    .warning { color: orange; }
+    .info { color: blue; }
+    pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+    button { margin: 5px; padding: 8px 16px; }
+  </style>
+</head>
+<body>
+  <h1>🔧 v2.0 模組系統調試工具</h1>
+  
+  <div class="test-section">
+    <h3>1. 檔案載入檢查</h3>
+    <button onclick="checkFiles()">檢查所有模組檔案</button>
+    <div id="fileResults"></div>
+  </div>
+
+  <div class="test-section">
+    <h3>2. 模組系統初始化測試</h3>
+    <button onclick="testModuleSystem()">測試模組系統</button>
+    <div id="moduleResults"></div>
+  </div>
+
+  <div class="test-section">
+    <h3>3. 個別模組測試</h3>
+    <button onclick="testIndividualModules()">測試各模組</button>
+    <div id="individualResults"></div>
+  </div>
+
+  <div class="test-section">
+    <h3>4. 應用程式完整測試</h3>
+    <button onclick="testFullApp()">完整測試</button>
+    <div id="appResults"></div>
+  </div>
+
+  <div class="test-section">
+    <h3>5. 錯誤日誌</h3>
+    <button onclick="clearLog()">清除日誌</button>
+    <button onclick="downloadLog()">下載日誌</button>
+    <pre id="errorLog"></pre>
+  </div>
+
+<script src="scripts/jquery-3.7.1.slim.min.js"></script>
+<script src="scripts/modules/core.js"></script>
+<script src="scripts/modules/config.js"></script>
+<script src="scripts/modules/cangjie.js"></script>
+<script src="scripts/modules/charFilter.js"></script>
+<script src="scripts/modules/ui.js"></script>
+<script src="scripts/modules/app.js"></script>
+
+<script>
+// 錯誤收集器
+const errorLog = [];
+const originalConsoleError = console.error;
+const originalConsoleWarn = console.warn;
+
+console.error = function(...args) {
+  errorLog.push({ type: 'error', timestamp: new Date().toISOString(), message: args.join(' ') });
+  updateErrorLog();
+  return originalConsoleError.apply(console, args);
+};
+
+console.warn = function(...args) {
+  errorLog.push({ type: 'warning', timestamp: new Date().toISOString(), message: args.join(' ') });
+  updateErrorLog();
+  return originalConsoleWarn.apply(console, arguments);
+};
+
+function updateErrorLog() {
+  const $log = $('#errorLog');
+  const logText = errorLog.map(entry => 
+    `[${entry.timestamp}] ${entry.type.toUpperCase()}: ${entry.message}`
+  ).join('\n');
+  $log.text(logText);
+}
+
+function clearLog() {
+  errorLog.length = 0;
+  updateErrorLog();
+}
+
+function downloadLog() {
+  const logText = errorLog.map(entry => 
+    `[${entry.timestamp}] ${entry.type.toUpperCase()}: ${entry.message}`
+  ).join('\n');
+  
+  const blob = new Blob([logText], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `debug_log_${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  URL.revokeObjectURL(url);
+  a.remove();
+}
+
+// 檢查檔案載入
+async function checkFiles() {
+  const $results = $('#fileResults');
+  $results.html('<p>檢查中...</p>');
+  
+  const files = [
+    'scripts/jquery-3.7.1.slim.min.js',
+    'scripts/modules/core.js',
+    'scripts/modules/config.js', 
+    'scripts/modules/cangjie.js',
+    'scripts/modules/charFilter.js',
+    'scripts/modules/ui.js',
+    'scripts/modules/app.js'
+  ];
+  
+  const results = [];
+  
+  for (const file of files) {
+    try {
+      const resp = await fetch(file);
+      if (resp.ok) {
+        results.push(`<span class="success">✅ ${file} (${resp.status})</span>`);
+      } else {
+        results.push(`<span class="error">❌ ${file} (${resp.status})</span>`);
+      }
+    } catch (error) {
+      results.push(`<span class="error">❌ ${file} (載入失敗: ${error.message})</span>`);
+    }
+  }
+  
+  $results.html(results.join('<br>'));
+}
+
+// 測試模組系統
+async function testModuleSystem() {
+  const $results = $('#moduleResults');
+  $results.html('<p>測試中...</p>');
+  
+  const tests = [];
+  
+  // 檢查 ModuleSystem 是否存在
+  if (typeof ModuleSystem === 'undefined') {
+    tests.push('<span class="error">❌ ModuleSystem 未定義</span>');
+    $results.html(tests.join('<br>'));
+    return;
+  } else {
+    tests.push('<span class="success">✅ ModuleSystem 已定義</span>');
+  }
+  
+  // 檢查核心方法
+  const methods = ['register', 'get', 'init', 'status'];
+  for (const method of methods) {
+    if (typeof ModuleSystem[method] === 'function') {
+      tests.push(`<span class="success">✅ ModuleSystem.${method} 可用</span>`);
+    } else {
+      tests.push(`<span class="error">❌ ModuleSystem.${method} 不可用</span>`);
+    }
+  }
+  
+  // 檢查模組註冊狀態
+  try {
+    const status = ModuleSystem.status();
+    tests.push(`<span class="info">📊 已註冊模組: ${status.modules.join(', ')}</span>`);
+    tests.push(`<span class="info">📊 已載入實例: ${status.loadedModules.join(', ')}</span>`);
+  } catch (error) {
+    tests.push(`<span class="error">❌ 無法獲取模組狀態: ${error.message}</span>`);
+  }
+  
+  $results.html(tests.join('<br>'));
+}
+
+// 測試個別模組
+async function testIndividualModules() {
+  const $results = $('#individualResults');
+  $results.html('<p>測試中...</p>');
+  
+  const modules = ['config', 'cangjie', 'charFilter', 'ui', 'app'];
+  const results = [];
+  
+  for (const moduleName of modules) {
+    try {
+      const module = await ModuleSystem.get(moduleName);
+      if (module && module.initialized) {
+        results.push(`<span class="success">✅ ${moduleName} 模組正常</span>`);
+      } else if (module) {
+        results.push(`<span class="warning">⚠️ ${moduleName} 模組未初始化</span>`);
+      } else {
+        results.push(`<span class="error">❌ ${moduleName} 模組獲取失敗</span>`);
+      }
+    } catch (error) {
+      results.push(`<span class="error">❌ ${moduleName} 錯誤: ${error.message}</span>`);
+    }
+  }
+  
+  $results.html(results.join('<br>'));
+}
+
+// 完整應用程式測試
+async function testFullApp() {
+  const $results = $('#appResults');
+  $results.html('<p>執行完整測試...</p>');
+  
+  try {
+    // 初始化模組系統
+    const result = await ModuleSystem.init(['config', 'cangjie', 'charFilter', 'ui', 'app']);
+    
+    const tests = [];
+    
+    if (result.success.length > 0) {
+      tests.push(`<span class="success">✅ 成功載入: ${result.success.join(', ')}</span>`);
+    }
+    
+    if (result.failed.length > 0) {
+      tests.push(`<span class="error">❌ 載入失敗: ${result.failed.map(f => f.name).join(', ')}</span>`);
+      result.failed.forEach(failure => {
+        tests.push(`<span class="error">   └─ ${failure.name}: ${failure.error.message}</span>`);
+      });
+    }
+    
+    // 測試核心功能
+    try {
+      const app = await ModuleSystem.get('app');
+      const ui = await ModuleSystem.get('ui');
+      
+      tests.push('<span class="success">✅ 應用程式實例獲取成功</span>');
+      tests.push('<span class="success">✅ UI 實例獲取成功</span>');
+      
+      // 測試頁面檢測
+      const pageType = app.pageType;
+      tests.push(`<span class="info">📄 檢測到頁面類型: ${pageType}</span>`);
+      
+    } catch (error) {
+      tests.push(`<span class="error">❌ 應用程式測試失敗: ${error.message}</span>`);
+    }
+    
+    $results.html(tests.join('<br>'));
+    
+  } catch (error) {
+    $results.html(`<span class="error">❌ 完整測試失敗: ${error.message}</span>`);
+  }
+}
+
+// 自動執行基本檢查
+$(function() {
+  setTimeout(() => {
+    console.log('🔧 調試工具已載入，執行基本檢查...');
+    checkFiles();
+  }, 1000);
+});
+</script>
+
+</body>
+</html>

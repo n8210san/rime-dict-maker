@@ -1,0 +1,110 @@
+{
+  "encoding": {
+    "default": "utf-8",
+    "options": [
+      "utf-8",
+      "big5", 
+      "gbk",
+      "gb18030",
+      "shift_jis",
+      "utf-16le",
+      "utf-16be"
+    ]
+  },
+  "fileInput": {
+    "acceptTypes": ".txt,.md,.csv,.json,.log,.xml,.html,.htm,text/*",
+    "multiple": true
+  },
+  "sortOrder": {
+    "default": "count",
+    "options": [
+      "count",
+      "alpha"
+    ]
+  },
+  "textFilter": {
+    "default": "all",
+    "options": [
+      "all",
+      "cjk", 
+      "en"
+    ]
+  },
+  "freeCj": {
+    "limit5Chars": true,
+    "includeSingleChar": true,
+    "includeWordGroup": true
+  },
+  "buttons": {
+    "openFile": {
+      "text": "開啟檔案",
+      "enabled": true
+    },
+    "simple": {
+      "text": "簡易斷句+去重",
+      "enabled": true
+    },
+    "punctuationSortCount": {
+      "text": "簡易斷句+去重計數+排序",
+      "enabled": true
+    },
+    "pureEn": {
+      "text": "純英文",
+      "enabled": true
+    },
+    "jieba": {
+      "text": "斷詞",
+      "enabled": true
+    },
+    "jiebaCustom": {
+      "text": "自訂斷詞",
+      "enabled": true
+    },
+    "pime": {
+      "text": "Pime 轉 Rime",
+      "enabled": true
+    },
+    "rime": {
+      "text": "Rime 格式",
+      "enabled": true
+    },
+    "freeCj": {
+      "text": "freeCj 格式",
+      "enabled": true
+    },
+    "nextStep": {
+      "text": "←輸出轉輸入",
+      "enabled": true
+    },
+    "swap": {
+      "text": "←互換→",
+      "enabled": false,
+      "display": false
+    },
+    "undo": {
+      "text": "復原",
+      "enabled": true
+    }
+  },
+  "ui": {
+    "pageTitle": "斷詞整理器",
+    "inputPlaceholder": "請在此輸入文字...",
+    "customDict": {
+      "modalTitle": "自訂詞典（JSON 陣列或逗號分隔字串）",
+      "placeholder": "[\"這個\", 99999999, \"n\"], [\"布丁\", 99999999, \"n\"]] 或 這個,布丁,是,在",
+      "cancelText": "取消",
+      "applyText": "套用並斷詞"
+    }
+  },
+  "links": {
+    "dictMaker": {
+      "url": "dictMaker.html",
+      "target": "dictMaker",
+      "text": "字典整理器"
+    }
+  },
+  "server": {
+    "instructions": "專案目錄下開啟server : npx http-server  即可正常使用",
+    "alternativeUrl": "http://localhost:8080/jieba-js/words.html"
+  }
+}

@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>字典整理器 v2.0</title>
+  <link rel="stylesheet" href="words.css" />
+  <style>
+    /* 優雅的載入動畫 */
+    .loading-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      transition: opacity 0.5s ease;
+    }
+    
+    .loading-container.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+    
+    .loading-spinner {
+      width: 60px;
+      height: 60px;
+      border: 4px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 1s ease-in-out infinite;
+      margin-bottom: 20px;
+    }
+    
+    .loading-text {
+      color: white;
+      font-size: 18px;
+      font-weight: 300;
+      text-align: center;
+      line-height: 1.6;
+    }
+    
+    .loading-progress {
+      width: 200px;
+      height: 2px;
+      background: rgba(255,255,255,0.3);
+      border-radius: 1px;
+      margin-top: 15px;
+      overflow: hidden;
+    }
+    
+    .loading-progress-bar {
+      height: 100%;
+      background: white;
+      border-radius: 1px;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* 錯誤提示卡片 */
+    .error-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.8);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+    }
+    
+    .error-card {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      max-width: 500px;
+      margin: 20px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+      animation: slideUp 0.3s ease;
+    }
+    
+    @keyframes slideUp {
+      from { transform: translateY(30px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    
+    .error-icon {
+      font-size: 48px;
+      text-align: center;
+      margin-bottom: 15px;
+    }
+    
+    .error-title {
+      font-size: 20px;
+      font-weight: 600;
+      text-align: center;
+      margin-bottom: 15px;
+      color: #333;
+    }
+    
+    .error-message {
+      color: #666;
+      line-height: 1.6;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    
+    .error-details {
+      background: #f8f9fa;
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 20px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      color: #e74c3c;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+    
+    .error-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+    
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: #5a6fd8;
+    }
+    
+    .btn-secondary {
+      background: #f8f9fa;
+      color: #333;
+      border: 1px solid #dee2e6;
+    }
+    
+    .btn-secondary:hover {
+      background: #e9ecef;
+    }
+    
+    /* 成功狀態指示器 */
+    .status-indicator {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      color: white;
+      font-size: 14px;
+      font-weight: 500;
+      transform: translateX(400px);
+      transition: transform 0.3s ease;
+      z-index: 1000;
+    }
+    
+    .status-indicator.show {
+      transform: translateX(0);
+    }
+    
+    .status-indicator.success {
+      background: linear-gradient(135deg, #4CAF50, #45a049);
+    }
+    
+    .status-indicator.error {
+      background: linear-gradient(135deg, #f44336, #d32f2f);
+    }
+    
+    /* 主內容淡入效果 */
+    .main-content {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.5s ease;
+    }
+    
+    .main-content.ready {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    
+    /* 美化現有元素 */
+    .controls {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .container {
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .text-box h3 {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      margin: 0;
+      padding: 15px 20px;
+      font-weight: 500;
+    }
+    
+    .text-box textarea {
+      border: none;
+      resize: vertical;
+      font-family: 'Courier New', monospace;
+    }
+    
+    .text-box textarea:focus {
+      outline: none;
+      box-shadow: inset 0 0 0 2px #667eea;
+    }
+    
+    button {
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    button:not(:disabled):hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    #quickBtn, #fcjBtn {
+      background: linear-gradient(135deg, #4CAF50, #45a049);
+      color: white;
+      font-size: 16px;
+      padding: 12px 24px;
+      margin: 0 8px;
+    }
+    
+    /* 響應式設計 */
+    @media (max-width: 768px) {
+      .error-card {
+        margin: 10px;
+        padding: 20px;
+      }
+      
+      .error-actions {
+        flex-direction: column;
+      }
+      
+      .btn {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- 優雅的載入畫面 -->
+  <div id="loadingContainer" class="loading-container">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">
+      <div id="loadingMessage">正在載入字典整理器 v2.0...</div>
+      <div class="loading-progress">
+        <div id="loadingProgress" class="loading-progress-bar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 錯誤提示卡片 -->
+  <div id="errorOverlay" class="error-overlay">
+    <div class="error-card">
+      <div class="error-icon">⚠️</div>
+      <div class="error-title">模組載入失敗</div>
+      <div class="error-message">
+        v2.0 模組系統無法正常啟動，但您仍可使用傳統版本的所有功能。
+      </div>
+      <div id="errorDetails" class="error-details"></div>
+      <div class="error-actions">
+        <button class="btn btn-primary" onclick="useTraditionalVersion()">
+          使用傳統版本
+        </button>
+        <button class="btn btn-secondary" onclick="retryLoading()">
+          重新嘗試
+        </button>
+        <button class="btn btn-secondary" onclick="dismissError()">
+          繼續調試
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 狀態指示器 -->
+  <div id="statusIndicator" class="status-indicator">
+    <span id="statusText"></span>
+  </div>
+
+  <!-- 主要內容 -->
+  <div id="mainContent" class="main-content">
+    <h2>字典整理器 v2.0</h2>
+    <small><hr><a href="words_v2_elegant.html">斷詞整理器 v2.0</a><hr></small>
+
+    <div class="controls">
+        <button id="openFileBtn">📁 開啟檔案</button>
+        <input type="file" id="openFileInput" accept=".txt,.md,.csv,.json,.log,.xml,.html,.htm,text/*" multiple style="display:none" />
+        
+        <div id="encodingContainer" style="display: inline-block; margin-left: 8px;"></div>
+        
+        排序字典檔計數範圍：
+        <input type="text" id="rangeInput" placeholder=">300 或 300-20 或 50-250" value=">2999" style="height: 40px; width: 180px; padding: 0 8px; border: 1px solid #ddd; border-radius: 4px;" />
+        <button id="sortDictBtn">排序字典檔</button>
+        <button id="dedupeWithCommentsBtn">註解去重→Rime</button>
+        <button id="normalizeBtn">補完整字典</button>
+        
+        <br><br>
+        
+        <button id="quickBtn">⚡ 速成</button>
+        <button id="fcjBtn">🚀 快倉</button>
+        
+        <label title="在輸出時加上原始計數" style="margin-left:16px; font-size:13px;">
+          <input type="checkbox" id="countOpt"> 計數
+        </label>
+        
+        <label title="選擇分隔符" style="margin-left:16px; font-size:13px;">分隔符:
+          <select id="separatorOpt" style="margin-left:4px; border: 1px solid #ddd; border-radius: 4px; padding: 4px;">
+            <option value="\t">tab</option>
+            <option value=" ">空格</option>
+          </select>
+        </label>
+        
+        <br><br>
+        
+        <span id="dictMakerCharOptions" style="margin-right:16px;">輸出詞組字數：</span>
+        
+        <label title="單字次數 > 1000 且為 3 碼時，另加一列左右碼" style="font-size:13px;">
+          <input type="checkbox" id="fcjOpt_freq1000_code3_to_code2" checked> 常用單字另加左右碼
+        </label>
+        
+        <br><br>
+        
+        <button id="nextStepBtn">←輸出轉輸入</button>
+        <button id="swapBtn">←互換→</button>
+        <button id="undoBtn">復原</button>
+        <button id="downloadBtn">💾 下載結果</button>
+    </div>
+
+    <div id="textareaContainer"></div>
+    
+    <div id="statusContainer" style="margin: 12px 0;">
+      <div id="excuted_result" style="color: #4CAF50; font-weight: 500;"></div>
+    </div>
+  </div>
+
+<script src="scripts/jquery-3.7.1.slim.min.js"></script>
+<script src="scripts/modules/core.js"></script>
+<script src="scripts/modules/config.js"></script>
+<script src="scripts/modules/cangjie.js"></script>
+<script src="scripts/modules/charFilter.js"></script>
+<script src="scripts/modules/ui.js"></script>
+<script src="scripts/modules/app.js"></script>
+
+<script>
+// 優雅的載入管理器
+class ElegantLoader {
+  constructor() {
+    this.steps = [
+      { message: '正在載入核心系統...', progress: 20 },
+      { message: '正在初始化配置模組...', progress: 40 },
+      { message: '正在載入倉頡編碼器...', progress: 60 },
+      { message: '正在設置用戶界面...', progress: 80 },
+      { message: '正在完成初始化...', progress: 100 }
+    ];
+    this.currentStep = 0;
+  }
+
+  updateProgress(step, message = null) {
+    if (step !== undefined) this.currentStep = step;
+    
+    const stepData = this.steps[this.currentStep] || this.steps[this.steps.length - 1];
+    const displayMessage = message || stepData.message;
+    
+    $('#loadingMessage').text(displayMessage);
+    $('#loadingProgress').css('width', stepData.progress + '%');
+  }
+
+  complete() {
+    this.updateProgress(4, '載入完成！');
+    setTimeout(() => {
+      $('#loadingContainer').addClass('fade-out');
+      $('#mainContent').addClass('ready');
+      this.showStatus('字典整理器 v2.0 已就緒', 'success');
+    }, 500);
+  }
+
+  showError(error) {
+    $('#loadingContainer').addClass('fade-out');
+    $('#errorDetails').text(error.message);
+    $('#errorOverlay').css('display', 'flex');
+  }
+
+  showStatus(message, type = 'success') {
+    const $indicator = $('#statusIndicator');
+    const $text = $('#statusText');
+    
+    $text.text(message);
+    $indicator.removeClass('success error').addClass(type).addClass('show');
+    
+    setTimeout(() => {
+      $indicator.removeClass('show');
+    }, 3000);
+  }
+}
+
+const loader = new ElegantLoader();
+
+// 應用程式啟動器
+$(async function() {
+  try {
+    loader.updateProgress(0);
+    
+    // 檢查模組系統
+    if (typeof ModuleSystem === 'undefined') {
+      throw new Error('ModuleSystem 未定義，請檢查核心模組是否正確載入');
+    }
+    
+    loader.updateProgress(1);
+    await new Promise(resolve => setTimeout(resolve, 300)); // 讓用戶看到載入過程
+    
+    // 初始化模組系統
+    const result = await ModuleSystem.init([
+      'config', 'cangjie', 'charFilter', 'ui', 'app'
+    ]);
+    
+    loader.updateProgress(2);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    if (result.failed.length > 0) {
+      const failedDetails = result.failed.map(f => `${f.name}: ${f.error.message}`).join('\n');
+      throw new Error(`模組載入失敗:\n${failedDetails}`);
+    }
+    
+    loader.updateProgress(3);
+    
+    // 獲取應用程式實例
+    const app = await ModuleSystem.get('app');
+    const ui = await ModuleSystem.get('ui');
+    
+    // 設置UI組件
+    ui.createEncodingSelect('#encodingContainer');
+    ui.createDualTextareas('#textareaContainer', {
+      inputPlaceholder: '請在此輸入字典內容...',
+      showCounts: true
+    });
+    
+    loader.updateProgress(4);
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    // 監聽應用程式事件
+    app.on('appReady', () => {
+      loader.complete();
+    });
+    
+    app.on('statusUpdate', (data) => {
+      loader.showStatus(data.message, data.type === 'error' ? 'error' : 'success');
+    });
+    
+    // 添加優雅的開發者工具
+    global.dev = {
+      getModuleStatus: () => ModuleSystem.status(),
+      getAppStatus: () => app.getAppStatus(),
+      reloadModule: (name) => ModuleSystem.core.reload(name),
+      getModule: (name) => ModuleSystem.get(name),
+      showStatus: (msg, type) => loader.showStatus(msg, type)
+    };
+    
+  } catch (error) {
+    console.error('💥 應用程式啟動失敗:', error);
+    loader.showError(error);
+  }
+});
+
+// 錯誤處理函數
+function useTraditionalVersion() {
+  loader.showStatus('正在切換到傳統版本...', 'success');
+  setTimeout(() => {
+    window.location.href = 'dictMaker.html';
+  }, 1000);
+}
+
+function retryLoading() {
+  $('#errorOverlay').hide();
+  $('#loadingContainer').removeClass('fade-out');
+  loader.currentStep = 0;
+  loader.updateProgress(0, '正在重新載入...');
+  
+  setTimeout(() => {
+    window.location.reload();
+  }, 1000);
+}
+
+function dismissError() {
+  $('#errorOverlay').hide();
+  $('#mainContent').addClass('ready');
+  loader.showStatus('已進入調試模式，請查看控制台', 'error');
+}
+
+// 快捷鍵支援
+$(document).on('keydown', function(e) {
+  if (e.ctrlKey || e.metaKey) {
+    switch(e.key) {
+      case 'z':
+        e.preventDefault();
+        $('#undoBtn').click();
+        break;
+      case 's':
+        e.preventDefault();
+        $('#downloadBtn').click();
+        break;
+    }
+  }
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,214 @@
+# Users (Kevin增加)
+docs/*.dot
+docs/*_summary.md
+*_backup*
+test_*
+temp_*
+tmp_*
+*_tmp.*
+*.bk
+*pycache*
+
+---
+
+# agents
+.augment/
+.gemini/
+.rovodev/
+*AGENTS.md
+
+---
+
+# Sensitive Information and Data
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+instance/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.key
+*.pem
+secrets/
+
+# CobotSatellite specific
+# Uploaded files and data
+
+---
+
+# Runtime and ephemeral files  一般性排除
+data/
+**/data # 保險起見重複規定
+uploads/
+**/uploads
+*.db
+*.manifest
+*.spec
+
+# Logs
+logs/
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage reports
+coverage/
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Translations
+*.mo
+*.pot
+
+# Jupyter/IPython
+.ipynb_checkpoints
+profile_default/
+ipython_config.py
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+---
+
+# Built/Generated files and directories
+#
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+*.egg
+.pyre/
+.nyc_output
+.installed.cfg
+MANIFEST
+*.manifest
+*.spec
+*.sage.py
+
+# Scrapy
+.scrapy
+
+# Sphinx
+docs/_build/
+
+# PyBuilder
+target/
+
+# mkdocs
+/site
+
+# Web
+node_modules/
+bower_components/
+dist/
+.npm
+.eslintcache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+.node_repl_history
+*.tgz
+
+# Frameworks
+.webassets-cache
+.next
+.nuxt
+.cache
+.parcel-cache
+public
+.out
+.storybook-out
+__pypackages__/
+
+# ROS
+devel/
+build/
+install/
+.catkin_workspace
+
+# Docker
+.dockerignore
+shared_data/
+logs_data/
+
+---
+
+# Dependencies and package management
+pip-log.txt
+pip-delete-this-directory.txt
+#Pipfile.lock
+
+---
+
+# IDE and OS specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.spyderproject
+.spyproject
+.ropeproject
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+---
+
+# Large Binary Files
+*.pt
+*.pth
+*.onnx
+*.pb
+*.h5
+*.tflite
+test_images/
+test_videos/
+temp_files/

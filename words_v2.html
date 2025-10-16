@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🤘斷詞整理器 v2.0 - 現代化架構</title>
+  <link rel="stylesheet" href="words.css" />
+  <style>
+    .module-status {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      z-index: 1000;
+    }
+    .module-status.ready { background: rgba(0,128,0,0.8); }
+    .module-status.loading { background: rgba(255,165,0,0.8); }
+    .module-status.error { background: rgba(255,0,0,0.8); }
+  </style>
+</head>
+<body>
+    <div id="moduleStatus" class="module-status loading">載入中...</div>
+    
+    <h2 id="pageTitle">🤘斷詞整理器 v2.0🤘</h2>
+    <small><hr>現代化模組架構，零配置自動優化 <br>快捷鍵: Ctrl+Z 復原, Ctrl+S 下載 <hr><a href="dictMaker_v2.html" target="dictMaker">字典整理器 v2.0</a><hr></small>
+
+    <div class="controls">
+        <div id="encodingContainer" style="display: inline-block;"></div>
+        
+        <input type="file" id="openFileInput" accept=".txt,.md,.csv,.json,.log,.xml,.html,.htm,text/*" multiple style="display:none" />
+        <button id="openFileBtn">開啟檔案</button>
+        
+        <button id="simpleBtn">簡易斷句+去重</button>
+        <button id="punctuationSortCountBtn">簡易斷句+去重計數+排序</button>
+        
+        <select id="sortOrderSelect" title="排序方式">
+          <option value="count" selected>計數排序</option>
+          <option value="alpha">字母排序</option>
+        </select>
+        
+        <select id="langFilterSelect">
+          <option value="all">全部（中、日、韓、英）</option>
+          <option value="zhen" selected>中英文</option>
+          <option value="cjk">中日韓</option>
+          <option value="zh">純中文</option>
+          <option value="en">純英文</option>
+        </select>
+        
+        <button id="jiebaBtn"> 斷詞 </button>
+        <button id="jiebaCustomBtn"> 自訂斷詞 </button>
+        <button id="PimeBtn"> 字根後置 (Pime 轉 Rime)</button>
+        <button id="RimeBtn"> Rime 格式 {字 字 次} </button>
+        
+        <input type="number" id="rimeBaseInput" value="3" min="1" max="9999" style="width: 60px; height:40px; margin-left: 8px;" title="基數">
+        
+        <button id="freeCjBtn"> freeCj 格式 </button>
+        
+        <span id="wordsCharOptions" style="margin-left: 8px;">輸出詞組字數：</span>
+        
+        <label style="margin-left: 8px;" title="輸出限最多5碼字根 (for PIME快倉)">
+          <input type="checkbox" id="freeCjLimit5Checkbox" checked> 限5碼
+        </label>
+        
+        <button id="nextStepBtn">←輸出轉輸入</button>
+        <button id="undoBtn">復原</button>
+    </div>
+
+    <div id="textareaContainer"></div>
+    
+    <div id="statusContainer" style="margin: 12px 0;">
+      <div id="excuted_result" style="color: green;">斷詞整理器 v2.0 已就緒</div>
+      <div id="option_status" style="margin-top: 4px; font-size: 12px;"></div>
+    </div>
+
+<!-- 自訂詞典模態框 -->
+<div id="rovodevModalBackdrop" class="rovoModal-backdrop" style="display:none;"></div>
+<div id="rovodevCustomDictModal" class="rovoModal-modal" style="display:none;">
+  <div class="rovoModal-card">
+    <div class="rovoModal-header">自訂詞典（JSON 陣列或逗號分隔字串）</div>
+    <div class="rovoModal-body">
+      <textarea id="customDictInput" placeholder='[["這個", 99999999, "n"], ["布丁", 99999999, "n"]] 或 這個,布丁,是,在'></textarea>
+      <div id="customDictError" class="rovoModal-error"></div>
+    </div>
+    <div class="rovoModal-footer">
+      <button id="cancelCustomDictBtn" class="rovoModal-btn">取消</button>
+      <button id="applyCustomDictBtn" class="rovoModal-btn primary">套用並斷詞</button>
+    </div>
+  </div>
+</div>
+
+<!-- 現代化模組系統 -->
+<script src="scripts/jquery-3.7.1.slim.min.js"></script>
+<script src="scripts/modules/core.js"></script>
+<script src="scripts/modules/config.js"></script>
+<script src="scripts/modules/cangjie.js"></script>
+<script src="scripts/modules/charFilter.js"></script>
+<script src="scripts/modules/ui.js"></script>
+<script src="scripts/modules/app.js"></script>
+
+<!-- Jieba 斷詞支援 -->
+<script src="scripts/require-jieba-js.js"></script>
+
+<script>
+// 應用程式啟動器
+$(async function() {
+  const $status = $('#moduleStatus');
+  
+  try {
+    $status.text('載入模組系統...').removeClass().addClass('module-status loading');
+    
+    // 初始化模組系統
+    const result = await ModuleSystem.init([
+      'config', 'cangjie', 'charFilter', 'ui', 'app'
+    ]);
+    
+    if (result.failed.length > 0) {
+      console.warn('部分模組載入失敗:', result.failed);
+    }
+    
+    // 獲取應用程式實例
+    const app = await ModuleSystem.get('app');
+    const ui = await ModuleSystem.get('ui');
+    const config = await ModuleSystem.get('config');
+    
+    // 設置UI組件
+    ui.createEncodingSelect('#encodingContainer');
+    ui.createDualTextareas('#textareaContainer', {
+      inputPlaceholder: '請在此輸入文字...',
+      showCounts: true
+    });
+    
+    // 綁定自訂詞典模態框
+    setupCustomDictModal();
+    
+    // 綁定簡易處理按鈕
+    setupSimpleProcessing();
+    
+    // 綁定 Jieba 相關按鈕
+    setupJiebaButtons();
+    
+    // 綁定格式轉換按鈕
+    setupFormatButtons();
+    
+    // 監聽應用程式事件
+    app.on('appReady', (data) => {
+      console.log('🎉 應用程式已就緒:', data);
+      $status.text('v2.0 已就緒').removeClass().addClass('module-status ready');
+    });
+    
+    // 等待 Jieba 載入
+    ensureJiebaReady();
+    
+    console.log('🔧 Words v2.0 開發者工具已載入');
+    
+  } catch (error) {
+    console.error('💥 應用程式啟動失敗:', error);
+    $status.text('載入失敗').removeClass().addClass('module-status error');
+    
+    // 顯示詳細錯誤信息
+    $status.append(`<br><small>錯誤: ${error.message}</small>`);
+    $status.append('<br><small>請檢查瀏覽器控制台以獲取詳細信息</small>');
+    $status.append('<br><small>5秒後將提供選項...</small>');
+    
+    // 給用戶選擇
+    setTimeout(() => {
+      if (confirm('模組系統載入失敗。點擊確定載入傳統版本，點擊取消留在此頁面進行調試。')) {
+        window.location.href = 'words.html';
+      } else {
+        $status.text('已取消跳轉，請查看控制台進行調試').removeClass().addClass('module-status error');
+      }
+    }, 5000);
+  }
+});
+
+// 自訂詞典模態框
+function setupCustomDictModal() {
+  $('#jiebaCustomBtn').on('click', openCustomDictModal);
+  $('#cancelCustomDictBtn, #rovodevModalBackdrop').on('click', closeCustomDictModal);
+  $('#applyCustomDictBtn').on('click', applyCustomDict);
+}
+
+function openCustomDictModal() {
+  let stored = localStorage.getItem('rovodev_custom_dict');
+  let defaultDict;
+  try { 
+    defaultDict = stored ? JSON.parse(stored) : null; 
+  } catch (_) { 
+    defaultDict = null; 
+  }
+  
+  if (!Array.isArray(defaultDict)) {
+    defaultDict = [["繪製",99999999,"p"],["去重",777777,"n"],["幫我",666666,"n"]];
+  }
+  
+  $('#customDictInput').val(JSON.stringify(defaultDict, null, 2));
+  $('#customDictError').text('');
+  $('#rovodevModalBackdrop, #rovodevCustomDictModal').show();
+  setTimeout(() => $('#customDictInput').focus(), 0);
+}
+
+function closeCustomDictModal() {
+  $('#rovodevModalBackdrop, #rovodevCustomDictModal').hide();
+}
+
+async function applyCustomDict() {
+  const ui = await ModuleSystem.get('ui');
+  
+  try {
+    const input = $('#customDictInput').val();
+    const customDict = parseCustomDict(input);
+    
+    if (!customDict.length) {
+      throw new Error('自訂詞典為空');
+    }
+    
+    localStorage.setItem('rovodev_custom_dict', JSON.stringify(customDict));
+    
+    const text = $('#inputTextarea').val();
+    if (!text.trim()) {
+      ui.showStatus('請先輸入文字', 'warning');
+      return;
+    }
+    
+    if (typeof call_jieba_cut === 'function') {
+      call_jieba_cut(text, customDict, tokens => {
+        ui.setOutput(tokens.join(' '), 'jiebaCustom');
+        closeCustomDictModal();
+      });
+    } else {
+      ui.showStatus('Jieba 斷詞函式未載入', 'error');
+    }
+    
+  } catch (error) {
+    $('#customDictError').text(error.message);
+    ui.showStatus('自訂詞典處理失敗: ' + error.message, 'error');
+  }
+}
+
+function parseCustomDict(input) {
+  if (!input) return [];
+  const s = String(input).trim();
+  
+  try {
+    const arr = JSON.parse(s);
+    if (Array.isArray(arr)) return arr;
+  } catch (_) {}
+  
+  const tokens = s.split(/[,\s]+/).map(t=>t.trim()).filter(Boolean);
+  return tokens.map(w => [w, 99999999, 'n']);
+}
+
+// 簡易處理
+function setupSimpleProcessing() {
+  $('#simpleBtn').on('click', async () => {
+    const ui = await ModuleSystem.get('ui');
+    const text = prepare('dedup');
+    ui.setOutput(text, '簡易斷句去重');
+  });
+
+  $('#punctuationSortCountBtn').on('click', async () => {
+    const ui = await ModuleSystem.get('ui');
+    const words = prepare('[]');
+    const wordCounts = words.reduce((acc, word) => {
+      acc[word] = (acc[word] || 0) + 1;
+      return acc;
+    }, {});
+
+    const sortOrder = $('#sortOrderSelect').val();
+    let sortedWords;
+
+    if (sortOrder === 'alpha') {
+      sortedWords = Object.entries(wordCounts)
+        .sort(([wordA], [wordB]) => wordB.localeCompare(wordA))
+        .map(([word, count]) => `${word}\t${count}`);
+    } else {
+      sortedWords = Object.entries(wordCounts)
+        .sort(([, countA], [, countB]) => countB - countA)
+        .map(([word, count]) => `${word}\t${count}`);
+    }
+
+    ui.setOutput(sortedWords.join('\n'), 'punctuationSortCount');
+  });
+}
+
+// Jieba 按鈕
+function setupJiebaButtons() {
+  $('#jiebaBtn').on('click', async () => {
+    const ui = await ModuleSystem.get('ui');
+    
+    if (!checkJieba()) return;
+    
+    const txt = $('#inputTextarea').val();
+    if (txt) {
+      call_jieba_cut(txt, res => ui.setOutput(res.join(' '), 'jieba'));
+    }
+  });
+}
+
+// 格式轉換按鈕  
+function setupFormatButtons() {
+  $('#PimeBtn').on('click', async () => {
+    const ui = await ModuleSystem.get('ui');
+    const config = await ModuleSystem.get('config');
+    
+    const base = config.get('words.rimeBase', 3);
+    const src = $('#inputTextarea').val();
+    
+    const result = (src || '')
+      .replace(/^([a-z]+) (\S+)/g, `$2\t$1\t${base}`)
+      .replace(/\n([a-z]+) (\S+)/g, `\n$2\t$1\t${base}`);
+    
+    ui.setOutput(result, 'pime');
+  });
+
+  $('#RimeBtn').on('click', async () => {
+    const ui = await ModuleSystem.get('ui');
+    const config = await ModuleSystem.get('config');
+    
+    const txt = prepare('dedup');
+    const base = config.get('words.rimeBase', 3);
+    
+    if (txt && checkJieba()) {
+      call_jieba_cut(txt, res => ui.setOutput(toRime(res.join('\n'), base), 'rime'));
+    } else {
+      ui.setOutput(toRime(txt, base), 'rime');
+    }
+  });
+}
+
+// 工具函數
+function prepare(returnType = '') {
+  const txt = $('#inputTextarea').val() || '';
+  if (!txt.trim()) return returnType.includes('[]') ? [] : '';
+  
+  const filtered = langFiltering(txt);
+  const arr = filtered.split(/\s+/).filter(Boolean);
+  
+  if (returnType.includes('dedup')) {
+    return [...new Set(arr)].join('\n');
+  }
+  
+  return returnType.includes('[]') ? arr : arr.join('\n');
+}
+
+function langFiltering(txt) {
+  const filterType = $('#langFilterSelect').val();
+  const zh = '\u4e00-\u9fff';
+  const jp = '\u3040-\u309f\u30a0-\u30ff';
+  const kr = '\uac00-\ud7af';
+  const en = 'a-zA-Z';
+  
+  let pattern;
+  switch (filterType) {
+    case 'all': pattern = `${zh}${jp}${kr}${en}`; break;
+    case 'cjk': pattern = `${zh}${jp}${kr}`; break;
+    case 'zh': pattern = zh; break;
+    case 'en': pattern = en; break;
+    default: pattern = `${zh}${en}`;
+  }
+  
+  const regex = new RegExp(`[^${pattern}]`, 'g');
+  return txt.replace(regex, ' ');
+}
+
+function toRime(w, base = 3) {
+  return w.split('\n').filter(l=>l.trim()).map(l=>`${l}\t${l}\t${base}`).join('\n');
+}
+
+function checkJieba() {
+  const ok = typeof call_jieba_cut !== 'undefined';
+  if (!ok) {
+    ModuleSystem.get('ui').then(ui => 
+      ui.showStatus('Jieba 斷詞函式未載入，請稍候。', 'warning')
+    );
+  }
+  return ok;
+}
+
+function ensureJiebaReady() {
+  let tries = 100;
+  const tick = () => {
+    if (typeof call_jieba_cut === 'function') {
+      $('#pageTitle').css({ borderColor: '#0F0' });
+      if (typeof resume_jieba_cut === 'function') {
+        try { resume_jieba_cut(); } catch (e) { console.warn('resume error', e); }
+      }
+    } else if (tries-- > 0) {
+      setTimeout(tick, 100);
+    } else {
+      console.warn('Jieba not ready after waiting');
+    }
+  };
+  tick();
+}
+
+// 快捷鍵支援
+$(document).on('keydown', function(e) {
+  if (e.ctrlKey || e.metaKey) {
+    switch(e.key) {
+      case 'z':
+        e.preventDefault();
+        $('#undoBtn').click();
+        break;
+      case 's':
+        e.preventDefault();
+        ModuleSystem.get('ui').then(ui => ui.downloadOutput());
+        break;
+    }
+  }
+});
+</script>
+
+</body>
+</html>
