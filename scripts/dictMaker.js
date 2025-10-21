@@ -36,7 +36,175 @@ $(function(){
 
 
 
+let dictMakerFreeCjLimitCtrl = null;
+window.WORDS_TO_DICTMAKER_KEY = window.WORDS_TO_DICTMAKER_KEY || 'words_to_dictMaker_payload';
+const WORDS_TO_DICTMAKER_KEY = window.WORDS_TO_DICTMAKER_KEY;
+let isSyncingDictCountOpt = false;
+
+$(function() {
+  if (!window.IS_DICTMAKER_PAGE) return;
+  try {
+    const stored = localStorage.getItem(WORDS_TO_DICTMAKER_KEY);
+    console.log('[dictMaker] check transfer payload', stored);
+    if (!stored) return;
+
+    const parsed = JSON.parse(stored);
+    const text = parsed && typeof parsed.text === 'string' ? parsed.text : '';
+    if (!text.trim()) {
+      console.log('[dictMaker] payload empty after trim');
+      localStorage.removeItem(WORDS_TO_DICTMAKER_KEY);
+      return;
+    }
+
+    const applyPayload = () => {
+      if (typeof setInput === 'function') {
+        setInput(text, 'wordsTransfer');
+      } else {
+        const $input = $('#inputTextarea');
+        $input.val(text);
+        $input.trigger('input');
+      }
+    };
+
+    applyPayload();
+    setTimeout(applyPayload, 0);
+
+    console.log('[dictMaker] payload applied');
+    localStorage.removeItem(WORDS_TO_DICTMAKER_KEY);
+
+    const $meta = $('#outputMeta');
+    if ($meta.length) {
+      $meta.text('已從切詞工具導入資料');
+    }
+  } catch (e) {
+    console.warn('讀取跨頁傳入資料失敗:', e);
+  }
+});
+
+function getDictMakerFreeCjLimit(defaultValue = 0) {
+  if (dictMakerFreeCjLimitCtrl && typeof dictMakerFreeCjLimitCtrl.getValue === 'function') {
+    return dictMakerFreeCjLimitCtrl.getValue();
+  }
+  const $select = $('#freeCjLimitSelect');
+  if ($select.length) {
+    const val = parseInt($select.val(), 10);
+    if (Number.isFinite(val) && val >= 0) {
+      return val;
+    }
+  }
+  return defaultValue;
+}
+
+function setDictMakerFreeCjLimit(value) {
+  if (dictMakerFreeCjLimitCtrl && typeof dictMakerFreeCjLimitCtrl.setValue === 'function') {
+    dictMakerFreeCjLimitCtrl.setValue(value);
+  } else {
+    const $select = $('#freeCjLimitSelect');
+    if ($select.length) {
+      const fallback = parseInt($select.data('default-limit'), 10);
+      const val = Number.isFinite(value) ? String(value) : String(Number.isFinite(fallback) ? fallback : 0);
+      $select.val(val);
+    }
+  }
+}
+
 // 共用的字數過濾邏輯（使用組件提供的過濾器）
+function syncDictMakerCountOpt(baseValue) {
+  const $countOpt = $('#countOpt');
+  if (!$countOpt.length) return;
+  const baseEnabled = baseValue > 0;
+  const current = $countOpt.is(':checked');
+  if (current !== baseEnabled) {
+    isSyncingDictCountOpt = true;
+    $countOpt.prop('checked', baseEnabled);
+    isSyncingDictCountOpt = false;
+  }
+  if (typeof prefs !== 'undefined' && prefs.set) {
+    try { prefs.set('countOpt', baseEnabled); } catch (_) {}
+  }
+}
+
+
+// ===== 格式選項聯動（Rime/Pime 預設）=====
+function applyFormatPreset(preset) {
+  const p = String(preset || '').toLowerCase();
+  if (!p) return;
+
+  let rootOrder = 'after';
+  let separator = '\t';
+  let freeLimit = 0;
+  let base = 3; // Rime
+
+  if (p === 'pime') {
+    rootOrder = 'before';
+    separator = ' ';
+    freeLimit = 5;
+    base = 0; // Pime
+  }
+
+  // 1) 寫入 rime base（共用記憶）
+  if (typeof RimeBaseManager !== 'undefined') {
+    RimeBaseManager.setBase(base);
+  } else {
+    $('#rimeBaseInput').val(String(base)).trigger('input');
+  }
+
+  // 2) 寫入 rootOrder, separator
+  $('#rootOrderOpt').val(rootOrder).trigger('change');
+  $('#separatorOpt').val(separator).trigger('change');
+
+  // 3) 寫入 freeCjLimit
+  try { setDictMakerFreeCjLimit(freeLimit); } catch (_) {}
+  try { if (typeof prefs !== 'undefined') prefs.set('freeCjLimitSelect', String(freeLimit)); } catch (_) {}
+  $('#freeCjLimitSelect').trigger('change');
+}
+
+function initFormatSync() {
+  const $format = $('#formatOpt');
+  if (!$format.length) return;
+  $format.on('change', function() {
+    const v = $(this).val();
+    if (v === 'Rime' || v === 'Pime') {
+      applyFormatPreset(v);
+    }
+  });
+  // 初始化時不聯動，只有用戶主動選擇格式時才套用預設組合
+  // 其他選項（rootOrder、separator、freeCjLimit）各自恢復記憶值
+}function transformTextForRimeBase(text, baseValue) {
+  if (typeof RimeBaseManager !== 'undefined') {
+    return RimeBaseManager.applyBaseToText(text, baseValue, 1);
+  }
+  const lines = String(text || '').split(/\r?\n/);
+  const processed = [];
+  let total = 0;
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    if (line.startsWith('#')) {
+      processed.push(line);
+      continue;
+    }
+    const match = line.match(/^(.+?)(?:\s+(\d+))?$/);
+    if (!match) {
+      processed.push(line);
+      continue;
+    }
+    const word = match[1].trim();
+    if (!word) continue;
+    total += 1;
+    const count = match[2] ? parseInt(match[2], 10) : NaN;
+    if (baseValue > 0) {
+      const normalized = Number.isFinite(count) && count > 0 ? count : 1;
+      processed.push(`${word} ${normalized + baseValue}`);
+    } else {
+      processed.push(word);
+    }
+  }
+  return { text: processed.join('\n'), total };
+}
+
+
+
 function getCharLengthFilter() {
   // 檢查組件是否可用
   if (typeof CharLengthOptions !== 'undefined' && CharLengthOptions.getFilter) {
@@ -95,7 +263,9 @@ const PrefsManager = {
     ],
     // select 項目
     selects: [
-      { id: 'separatorOpt', defaultValue: ' ' }
+      { id: 'separatorOpt', defaultValue: ' ' },
+      { id: 'rootOrderOpt', defaultValue: 'after' },
+      { id: 'formatOpt', defaultValue: '' }
     ],
     // input 項目
     inputs: [
@@ -227,6 +397,11 @@ function nextStep() {
 
 // 初始化所有管理器
 $(function() {
+  // 1. 最前面初始化 PrefsManager
+  if (window.PrefsManager && typeof PrefsManager.init === 'function') {
+    PrefsManager.init();
+  }
+  
   // 初始化字數選項組件
   CharLengthOptions.inject('#dictMakerCharOptions', {
     options: [
@@ -238,8 +413,57 @@ $(function() {
     ]
   });
   
-  PrefsManager.init();
-  ButtonManager.init();
+  if (typeof FreeCjLimitSelector !== 'undefined') {
+    const defaultLimit = parseInt($('#freeCjLimitSelect').data('default-limit'), 10);
+    dictMakerFreeCjLimitCtrl = FreeCjLimitSelector.bind('#freeCjLimitSelect', {
+      defaultValue: Number.isFinite(defaultLimit) ? defaultLimit : 0
+    });
+  } else {
+    dictMakerFreeCjLimitCtrl = null;
+  }
+  
+  if (typeof RimeBaseManager !== 'undefined') {
+    let storedCountPref = null;
+    if (typeof prefs !== 'undefined' && typeof prefs.get === 'function') {
+      try { storedCountPref = prefs.get('countOpt'); } catch (_) { storedCountPref = null; }
+    }
+    if (storedCountPref === false || storedCountPref === '0') {
+      RimeBaseManager.setBase(0, { silent: true });
+    }
+    RimeBaseManager.bindInput('#rimeBaseInput', {
+      onChange: (base) => {
+        syncDictMakerCountOpt(base);
+      }
+    });
+    syncDictMakerCountOpt(RimeBaseManager.getBase());
+  } else {
+    $('#rimeBaseInput').on('input change', function() {
+      const val = parseInt($(this).val(), 10);
+      const baseValue = Number.isFinite(val) && val >= 0 ? val : 0;
+      syncDictMakerCountOpt(baseValue);
+    });
+  }
+  
+  $('#countOpt').on('change', function() {
+    if (isSyncingDictCountOpt) return;
+    if (typeof RimeBaseManager === 'undefined') return;
+    const checked = $(this).is(':checked');
+    if (checked) {
+      const currentBase = RimeBaseManager.getBase();
+      if (currentBase <= 0) {
+        const fallback = RimeBaseManager.getLastPositiveBase() || RimeBaseManager.getDefault();
+        RimeBaseManager.setBase(fallback);
+      }
+    } else {
+      const currentBase = RimeBaseManager.getBase();
+      if (currentBase > 0) {
+        RimeBaseManager.setBase(0);
+      }
+    }
+  });
+  
+  
+  initFormatSync();
 });
 
 // 補完整字典功能
@@ -288,7 +512,8 @@ async function normalizeDictionary() {
           const cjResult = await FcjUtils.cjMakeFromText(word, 'fcj', {
             charLengthFilter: () => true,
             showCount: false,
-            separator: ' '
+            separator: ' ',
+            freeCjMaxLength: freeCjLimit
           });
           
           if (cjResult) {
@@ -423,6 +648,8 @@ async function dedupeWithComments() {
 // 執行去重邏輯（從原 dedupeWithComments 提取）
 async function performDeduplication(lines) {
   const separator = ($('#separatorOpt').val() || ' ').replace(/\\t/g, '\t');
+  const defaultLimitAttr = parseInt($('#freeCjLimitSelect').data('default-limit'), 10);
+  const freeCjLimit = getDictMakerFreeCjLimit(Number.isFinite(defaultLimitAttr) ? defaultLimitAttr : 0);
   const result = new Array(lines.length);
   const seen = Object.create(null);
 
@@ -469,6 +696,10 @@ async function performDeduplication(lines) {
         // 都不是標準字根格式，跳過
         continue;
       }
+    }
+
+    if (freeCjLimit > 0 && root && root.length > freeCjLimit) {
+      root = root.substring(0, freeCjLimit);
     }
 
     const key = root + '|' + word;
@@ -598,6 +829,10 @@ function dedupeWithComments_v1() {
       continue;
     }
 
+    if (freeCjLimit > 0 && root && root.length > freeCjLimit) {
+      root = root.substring(0, freeCjLimit);
+    }
+
     const key = root + '|' + word;
 
     if (!seen.has(key)) {
@@ -663,11 +898,30 @@ function runMake(mode) {
   const raw = $('#inputTextarea').val() || '';
   const append3AtEnd = (mode === 'fcj') && $('#fcjOpt_freq1000_code3_to_code2').is(':checked');
   const charLengthFilter = getCharLengthFilter();
-  const showCount = $('#countOpt').is(':checked');
+  const base = typeof RimeBaseManager !== 'undefined'
+    ? RimeBaseManager.getBase()
+    : (() => {
+        const parsed = parseInt($('#rimeBaseInput').val(), 10);
+        return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+      })();
+  const baseEnabled = base > 0;
   const separator = ($('#separatorOpt').val() || ' ').replace(/\\t/g, '\t');
-  console.log('runMake params:', {charLengthFilter, showCount, separator});
+  const rootOrder = $('#rootOrderOpt').val() || 'after';
+  const defaultLimitAttr = parseInt($('#freeCjLimitSelect').data('default-limit'), 10);
+  const freeCjLimit = getDictMakerFreeCjLimit(Number.isFinite(defaultLimitAttr) ? defaultLimitAttr : 0);
+  console.log('runMake params:', { base, baseEnabled, separator });
 
-  FcjUtils.cjMakeFromText(raw, mode, { append3AtEnd, charLengthFilter, showCount, separator })
+  const payloadInfo = transformTextForRimeBase(raw, base);
+  const payload = payloadInfo.text;
+
+  FcjUtils.cjMakeFromText(payload, mode, {
+    append3AtEnd,
+    charLengthFilter,
+    showCount: baseEnabled,
+    separator,
+    rootOrder,
+    freeCjMaxLength: freeCjLimit
+  })
     .then(finalText => {
       $('#outputTextarea').val(finalText);
       const $outCount = $('#outputCount');
@@ -688,3 +942,6 @@ function runMake(mode) {
       alert(e && e.message ? e.message : '轉碼失敗');
     });
 }
+
+
+

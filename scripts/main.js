@@ -371,7 +371,10 @@ if (_host !== undefined) {
             _require_dictionary(_callback);
             return;
         }
-        require([ _host + "scripts/data/dictionary.js"], function (_dictionary) {
+        var dictionaryPath = (_host && /\/scripts\/$/i.test(_host))
+          ? _host + "data/dictionary.js"
+          : _host + "scripts/data/dictionary.js";
+        require([ dictionaryPath ], function (_dictionary) {
           PREDIFINED_DICTIONARY = JSON.parse(JSON.stringify(_dictionary))
           _require_callback(_dictionary, _callback)
         });

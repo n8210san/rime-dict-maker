@@ -184,8 +184,12 @@ $(() => {
 
     var s = document.createElement("script");
     s.type = "text/javascript";
-    s.setAttribute("data-main", _host + "scripts/main");
-    s.src = _host + "scripts/require.js";
+    var base = _host;
+    if (!_endsWith(base, "scripts/")) {
+      base = base.replace(/\/?$/, '/') + 'scripts/';
+    }
+    s.setAttribute("data-main", base + "main");
+    s.src = base + "require.js";
     document.body.appendChild(s);
   }
 })

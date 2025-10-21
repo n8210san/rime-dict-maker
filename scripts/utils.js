@@ -355,6 +355,198 @@
   $(ensureJiebaReady);
 
   // 輕量相容層：當檢測到現代模組系統時載入
+  const RIME_BASE_STORAGE_KEY = 'global_rime_base';
+  const RIME_BASE_DEFAULT = 3;
+  let currentRimeBase = null;
+  let lastPositiveRimeBase = RIME_BASE_DEFAULT;
+  const rimeBaseListeners = new Set();
+  const boundRimeBaseInputs = new Map();
+
+  function sanitizeRimeBase(value) {
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value) || value < 0) return 0;
+      return Math.floor(value);
+    }
+    const parsed = parseInt(value, 10);
+    if (!Number.isFinite(parsed) || parsed < 0) return 0;
+    return parsed;
+  }
+
+  function readStoredRimeBase() {
+    let stored = null;
+    try {
+      const raw = localStorage.getItem(RIME_BASE_STORAGE_KEY);
+      if (raw !== null) {
+        stored = sanitizeRimeBase(raw);
+      } else {
+        const wordsConfigRaw = localStorage.getItem('rovodev_words_config');
+        if (wordsConfigRaw) {
+          try {
+            const wordsConfig = JSON.parse(wordsConfigRaw);
+            if (wordsConfig && wordsConfig.rimeBase !== undefined) {
+              stored = sanitizeRimeBase(wordsConfig.rimeBase);
+            }
+          } catch (_) {}
+        }
+        if (stored === null) {
+          const dictBaseRaw = localStorage.getItem('dict_maker.rimeBase');
+          if (dictBaseRaw !== null) stored = sanitizeRimeBase(dictBaseRaw);
+        }
+        if (stored === null) {
+          const countOptRaw = localStorage.getItem('dict_maker.countOpt');
+          if (countOptRaw !== null) {
+            try {
+              const parsed = JSON.parse(countOptRaw);
+              if (parsed === true || parsed === '1') stored = RIME_BASE_DEFAULT;
+              else if (parsed === false || parsed === '0') stored = 0;
+            } catch (_) {}
+          }
+        }
+      }
+    } catch (_) {
+      stored = null;
+    }
+    if (stored === null) stored = RIME_BASE_DEFAULT;
+    return stored;
+  }
+
+  function persistRimeBase(value) {
+    try {
+      localStorage.setItem(RIME_BASE_STORAGE_KEY, String(value));
+      localStorage.setItem('dict_maker.rimeBase', String(value));
+    } catch (_) {}
+  }
+
+  function notifyRimeBaseChange(value) {
+    rimeBaseListeners.forEach(listener => {
+      try {
+        listener(value);
+      } catch (err) {
+        console.warn('RimeBaseManager listener error:', err);
+      }
+    });
+  }
+
+  function updateBoundRimeBaseInputs(value) {
+    boundRimeBaseInputs.forEach(($input, element) => {
+      if (!element || !document.contains(element)) {
+        boundRimeBaseInputs.delete(element);
+        return;
+      }
+      $input.val(value);
+    });
+  }
+
+  const RimeBaseManager = {
+    getDefault() {
+      return RIME_BASE_DEFAULT;
+    },
+    getBase() {
+      if (currentRimeBase === null) {
+        currentRimeBase = readStoredRimeBase();
+        if (currentRimeBase > 0) lastPositiveRimeBase = currentRimeBase;
+      }
+      return currentRimeBase;
+    },
+    setBase(value, options = {}) {
+      const sanitized = sanitizeRimeBase(value);
+      if (currentRimeBase === null) {
+        currentRimeBase = this.getBase();
+      }
+      if (sanitized === currentRimeBase) return currentRimeBase;
+      currentRimeBase = sanitized;
+      if (sanitized > 0) {
+        lastPositiveRimeBase = sanitized;
+      }
+      persistRimeBase(currentRimeBase);
+      updateBoundRimeBaseInputs(currentRimeBase);
+      if (!options.silent) {
+        notifyRimeBaseChange(currentRimeBase);
+      }
+      return currentRimeBase;
+    },
+    primeBase(value) {
+      if (currentRimeBase === null) {
+        this.setBase(value, { silent: true });
+      }
+    },
+    getLastPositiveBase() {
+      return lastPositiveRimeBase;
+    },
+    onChange(callback, { immediate = true } = {}) {
+      if (typeof callback !== 'function') return () => {};
+      rimeBaseListeners.add(callback);
+      if (immediate) {
+        try {
+          callback(this.getBase());
+        } catch (err) {
+          console.warn('RimeBaseManager listener init error:', err);
+        }
+      }
+      return () => rimeBaseListeners.delete(callback);
+    },
+    bindInput(selector, options = {}) {
+      if (typeof jQuery === 'undefined') return;
+      const $input = $(selector);
+      if (!$input.length) return;
+      const element = $input[0];
+      boundRimeBaseInputs.set(element, $input);
+      $input.val(this.getBase());
+      const handleInput = () => {
+        const raw = $input.val();
+        const sanitized = sanitizeRimeBase(raw);
+        this.setBase(sanitized);
+      };
+      $input.off('input.rimeBase change.rimeBase').on('input.rimeBase change.rimeBase', handleInput);
+      if (options.onChange) {
+        this.onChange(options.onChange);
+      }
+    },
+    applyBaseToText(text, baseValue, fallbackValue = 1) {
+      const base = sanitizeRimeBase(
+        baseValue === undefined || baseValue === null ? this.getBase() : baseValue
+      );
+      const baseEnabled = base > 0;
+      const lines = String(text || '')
+        .split(/\r?\n/)
+        .map(line => line.trim());
+      const processed = [];
+      let total = 0;
+
+      for (const line of lines) {
+        if (!line) continue;
+        if (line.startsWith('#')) {
+          processed.push(line);
+          continue;
+        }
+        const match = line.match(/^(.+?)(?:\s+(\d+))?$/);
+        if (!match) {
+          processed.push(line);
+          continue;
+        }
+        const word = match[1].trim();
+        if (!word) continue;
+        total += 1;
+        if (!baseEnabled) {
+          processed.push(word);
+          continue;
+        }
+        const rawCount = match[2] ? parseInt(match[2], 10) : NaN;
+        const normalized = Number.isFinite(rawCount) && rawCount > 0 ? rawCount : fallbackValue;
+        const finalCount = normalized + base;
+        processed.push(`${word} ${finalCount}`);
+      }
+
+      return {
+        text: processed.join('\n'),
+        total,
+        base
+      };
+    }
+  };
+
+  global.RimeBaseManager = RimeBaseManager;
+
   function loadCompatibilityLayer() {
     console.log('🔄 載入輕量相容層...');
     

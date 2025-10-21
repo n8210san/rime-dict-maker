@@ -49,7 +49,7 @@
         encoding: { default: "utf-8" },
         sortOrder: { default: "count" },
         freeCj: { 
-          limit5Chars: true,
+          limitChars: 5,
           includeSingleChar: true,
           includeWordGroup: true
         }
@@ -172,7 +172,9 @@
         append3AtEnd = false,
         charLengthFilter = () => true,
         showCount = false,
-        separator = ' '
+        separator = ' ',
+        rootOrder = 'after',
+        freeCjMaxLength = 0
       } = opts;
 
       const pushImmediate = (line) => {
@@ -214,7 +216,12 @@
             if (seen.has(key)) continue;
             
             seen.add(key);
-            out.push(`${han}${separator}${newCode}${originalCount}`);
+            
+            // Quick 模式本來就是2碼，不需要5碼限制
+            const outputLine = rootOrder === 'before' 
+              ? `${newCode}${separator}${han}${originalCount}`
+              : `${han}${separator}${newCode}${originalCount}`;
+            out.push(outputLine);
           }
         } else if (mode === 'fcj') {
           if (chars.length === 1) {
@@ -232,11 +239,32 @@
               if (Number.isFinite(parsed)) freq = parsed;
             }
 
+            // 如果啟用5碼限制，截斷字根
+            let finalMainCode = mainCode;
+            if (freeCjMaxLength > 0 && finalMainCode.length > freeCjMaxLength) {
+              finalMainCode = finalMainCode.substring(0, freeCjMaxLength);
+            }
+            
             if (freq > 1000 && mainCode.length === 3 && append3AtEnd) {
-              delayed3.push(`${han}${separator}${mainCode}${originalCount}`);
-              pushImmediate(`${han}${separator}${mainCode[0]}${mainCode[mainCode.length-1]}${originalCount}`);
+              const delayed3Line = rootOrder === 'before' 
+                ? `${finalMainCode}${separator}${han}${originalCount}`
+                : `${han}${separator}${finalMainCode}${originalCount}`;
+              delayed3.push(delayed3Line);
+              
+              let shortCode = mainCode[0] + mainCode[mainCode.length-1];
+              if (freeCjMaxLength > 0 && shortCode.length > freeCjMaxLength) {
+                shortCode = shortCode.substring(0, freeCjMaxLength);
+              }
+              
+              const immediateLine = rootOrder === 'before'
+                ? `${shortCode}${separator}${han}${originalCount}`
+                : `${han}${separator}${shortCode}${originalCount}`;
+              pushImmediate(immediateLine);
             } else {
-              pushImmediate(`${han}${separator}${mainCode}${originalCount}`);
+              const outputLine = rootOrder === 'before'
+                ? `${finalMainCode}${separator}${han}${originalCount}`
+                : `${han}${separator}${finalMainCode}${originalCount}`;
+              pushImmediate(outputLine);
             }
           } else {
             let composed = '';
@@ -257,7 +285,16 @@
             }
             
             if (allOk && composed) {
-              pushImmediate(`${phrase}${separator}${composed}${originalCount}`);
+              // 如果啟用5碼限制，截斷詞組字根
+              let finalComposed = composed;
+              if (freeCjMaxLength > 0 && finalComposed.length > freeCjMaxLength) {
+                finalComposed = finalComposed.substring(0, freeCjMaxLength);
+              }
+              
+              const outputLine = rootOrder === 'before'
+                ? `${finalComposed}${separator}${phrase}${originalCount}`
+                : `${phrase}${separator}${finalComposed}${originalCount}`;
+              pushImmediate(outputLine);
             }
           }
         }

@@ -137,15 +137,37 @@
           const config = this.dep('config');
           const charFilter = this.dep('charFilter');
           const cangjie = this.dep('cangjie');
+          const base = typeof RimeBaseManager !== 'undefined'
+            ? RimeBaseManager.getBase()
+            : (() => {
+                const parsed = parseInt($('#rimeBaseInput').val(), 10);
+                return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+              })();
+          const baseEnabled = base > 0;
+
+          const defaultLimitAttr = parseInt($('#freeCjLimitSelect').data('default-limit'), 10);
+          const freeCjLimit = (typeof getDictMakerFreeCjLimit === 'function')
+            ? getDictMakerFreeCjLimit(Number.isFinite(defaultLimitAttr) ? defaultLimitAttr : 0)
+            : 0;
 
           const options = {
             append3AtEnd: (mode === 'fcj') && config.get('dictMaker.fcjOpt_freq1000_code3_to_code2', false),
             charLengthFilter: charFilter.getFilter('dictMaker'),
-            showCount: config.get('dictMaker.countOpt', false),
-            separator: (config.get('dictMaker.separatorOpt', ' ') || ' ').replace(/\\t/g, '\t')
+            showCount: baseEnabled,
+            separator: (config.get('dictMaker.separatorOpt', ' ') || ' ').replace(/\\t/g, '\t'),
+            freeCjMaxLength: freeCjLimit
           };
 
-          const result = await cangjie.generateCodes(raw, mode, options);
+          const payloadInfo = typeof transformTextForRimeBase === 'function'
+            ? transformTextForRimeBase(raw, base)
+            : { text: raw };
+          const payload = payloadInfo.text;
+
+          if (typeof config.set === 'function') {
+            try { config.set('dictMaker.countOpt', baseEnabled); } catch (_) {}
+          }
+
+          const result = await cangjie.generateCodes(payload, mode, options);
           
           if (result.output) {
             this.dep('ui').setOutput(result.output, mode === 'quick' ? '速成編碼' : '快倉編碼');
@@ -198,17 +220,24 @@
           const cangjie = this.dep('cangjie');
           const charFilter = this.dep('charFilter');
           
+          const defaultLimitAttr = parseInt($('#freeCjLimitSelect').data('default-limit'), 10);
+          const freeCjLimit = (typeof getDictMakerFreeCjLimit === 'function')
+            ? getDictMakerFreeCjLimit(Number.isFinite(defaultLimitAttr) ? defaultLimitAttr : 0)
+            : 0;
+
           const result = await cangjie.generateCodes(text, 'fcj', {
             append3AtEnd: true,
-            charLengthFilter: charFilter.getFilter('words')
+            charLengthFilter: charFilter.getFilter('words'),
+            freeCjMaxLength: freeCjLimit
           });
 
           if (result.output) {
             let processed = result.output.replace(/(.+) ([a-z]+)/g, '$2 $1');
             
-            // 檢查限5碼選項
-            if ($('#freeCjLimit5Checkbox').is(':checked')) {
-              processed = processed.replace(/^([a-z]{5})[a-z]+/gm, '$1');
+            // �ˬd�r�ڽX�h�s�ﶵ
+            if (freeCjLimit > 0) {
+              const limitRegex = new RegExp(`^([a-z]{${freeCjLimit}})[a-z]+`, 'gm');
+              processed = processed.replace(limitRegex, '$1');
             }
 
             this.dep('ui').setOutput(processed, 'freeCj編碼');
@@ -354,7 +383,7 @@
       setupWordsConfig() {
         const config = this.dep('config');
         const bindings = {
-          '#freeCjLimit5Checkbox': 'limit5Chars',
+          '#freeCjLimitSelect': 'limitChars',
           '#rimeBaseInput': 'rimeBase',
           '#langFilterSelect': 'langFilter',
           '#sortOrderSelect': 'sortOrder'

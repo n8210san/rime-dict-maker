@@ -27,14 +27,25 @@
         const append3AtEnd = (mode === 'fcj') && $('#fcjOpt_freq1000_code3_to_code2').is(':checked');
         const charLengthFilter = global.unifiedCharFilter ? 
           global.unifiedCharFilter.getFilter('dictMaker') : (() => true);
-        const showCount = $('#countOpt').is(':checked');
+        const base = typeof global.RimeBaseManager !== 'undefined'
+          ? global.RimeBaseManager.getBase()
+          : (() => {
+              const parsed = parseInt($('#rimeBaseInput').val(), 10);
+              return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+            })();
+        const baseEnabled = base > 0;
         const separator = ($('#separatorOpt').val() || ' ').replace(/\\t/g, '\t');
 
         try {
-          const finalText = await global.unifiedCangjie.generateCodes(raw, mode, { 
+          const payloadInfo = typeof global.transformTextForRimeBase === 'function'
+            ? global.transformTextForRimeBase(raw, base)
+            : { text: raw };
+          const payload = payloadInfo.text;
+
+          const finalText = await global.unifiedCangjie.generateCodes(payload, mode, { 
             append3AtEnd, 
             charLengthFilter, 
-            showCount, 
+            showCount: baseEnabled, 
             separator 
           });
           
@@ -125,7 +136,7 @@
       };
 
       const wordsBindings = {
-        '#freeCjLimit5Checkbox': 'limit5Chars',
+        '#freeCjLimitSelect': 'limitChars',
         '#freeCjSingleCharCheckbox': 'includeSingleChar',
         '#freeCjWordGroupCheckbox': 'includeWordGroup'
       };

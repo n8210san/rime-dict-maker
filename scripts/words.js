@@ -21,7 +21,7 @@ function closeCustomDictModal() {
 // jieba check
 function checkJieba() {
   const ok = typeof call_jieba_cut !== 'undefined';
-  if (!ok) FcjUtils.updateOptionStatus('Jieba 斷詞函式未載入，請稍候。', 'warning');
+  if (!ok) setResultStatus('Jieba 斷詞函式未載入，請稍候。', 'warning');
   return ok;
 }
 
@@ -169,8 +169,139 @@ function prepare(returnType = '',regex = '') {
   if (returnType.includes('[]')) return prepared;
   return prepared.join('\n'); // str\n : 陣列用\n轉為換行的 --> 單字串
 }
-function toRime(w, base = 3) {
-  return w.split('\n').filter(l=>l.trim()).map(l=>`${l}\t${l}\t${base}`).join('\n');
+function getRimeBase() {
+  if (typeof RimeBaseManager !== 'undefined') {
+    return RimeBaseManager.getBase();
+  }
+  const parsed = parseInt($('#rimeBaseInput').val(), 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 3;
+}
+
+function setResultStatus(message, type = 'info', timeout = 5000) {
+  const $status = $('#excuted_result');
+  if (!$status.length) return;
+  const colors = { success: 'green', warning: 'orange', error: 'red', info: 'blue' };
+  const text = message || '';
+  $status.text(text).css('color', colors[type] || '');
+
+  if (timeout && type !== 'error') {
+    setTimeout(() => {
+      if ($status.text() === text) {
+        $status.text('').css('color', '');
+      }
+    }, timeout);
+  }
+}
+
+function normalizeRimeEntries(base) {
+  const prepared = prepare('dedup+num');
+  if (!prepared) return { payload: '', total: 0, base };
+  if (typeof RimeBaseManager === 'undefined') {
+    const lines = prepared.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    return { payload: lines.join('\n'), total: lines.length, base };
+  }
+  const result = RimeBaseManager.applyBaseToText(prepared, base, 1);
+  return {
+    payload: result.text,
+    total: result.total,
+    base: result.base
+  };
+}
+
+async function createRimeLines(payload, base, total) {
+  if (!payload || !total) return { lines: [], total: 0 };
+  if (typeof FcjUtils === 'undefined' || typeof FcjUtils.cjMakeFromText !== 'function') {
+    throw new Error('倉頡模組尚未載入');
+  }
+
+  const freeCjLimitAttr = parseInt($('#freeCjLimitSelect').data('default-limit'), 10);
+  const freeCjLimit = getWordsFreeCjLimit(Number.isFinite(freeCjLimitAttr) ? freeCjLimitAttr : 0);
+  const baseEnabled = base > 0;
+  const options = {
+    rootOrder: 'after',
+    separator: '\t',
+    showCount: baseEnabled,
+    charLengthFilter: getUnifiedCharLengthFilter(),
+    freeCjMaxLength: freeCjLimit
+  };
+
+  let raw = await FcjUtils.cjMakeFromText(payload, 'fcj', options);
+  if (raw && typeof raw === 'object' && typeof raw.output === 'string') {
+    raw = raw.output;
+  }
+  const lines = String(raw || '')
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean);
+
+  return { lines, total };
+}
+
+let wordsFreeCjLimitCtrl = null;
+
+function getWordsFreeCjLimit(defaultValue = 0) {
+  if (wordsFreeCjLimitCtrl && typeof wordsFreeCjLimitCtrl.getValue === 'function') {
+    return wordsFreeCjLimitCtrl.getValue();
+  }
+  const $select = $('#freeCjLimitSelect');
+  if ($select.length) {
+    const val = parseInt($select.val(), 10);
+    if (Number.isFinite(val) && val >= 0) return val;
+  }
+  return defaultValue;
+}
+
+function setWordsFreeCjLimit(value) {
+  if (wordsFreeCjLimitCtrl && typeof wordsFreeCjLimitCtrl.setValue === 'function') {
+    wordsFreeCjLimitCtrl.setValue(value);
+  } else {
+    const $select = $('#freeCjLimitSelect');
+    if ($select.length) {
+      const val = Number.isFinite(value) ? String(value) : String($select.data('default-limit') || 0);
+      $select.val(val);
+    }
+  }
+}
+
+$('#freeCjLimit5Checkbox').prop('checked', Number.isFinite(value) && value >= 5);
+function renderOptionStatus() {
+  const parts = [];
+
+  const langText = $('#langFilterSelect option:selected').text();
+  if (langText) parts.push(`語言:${langText.trim()}`);
+
+  const sortText = $('#sortOrderSelect option:selected').text();
+  if (sortText) parts.push(`排序:${sortText.trim()}`);
+
+  const base = getRimeBase();
+  if (Number.isFinite(base)) parts.push(`Rime基數:${base}`);
+
+  const lengthStates = [
+    ['單', '#freeCjSingleCharCheckbox'],
+    ['2字', '#freeCj2charCheckbox'],
+    ['3字', '#freeCj3charCheckbox'],
+    ['4字', '#freeCj4charCheckbox'],
+    ['5+字', '#freeCj5pluscharCheckbox']
+  ].map(([label, selector]) => {
+    const $el = $(selector);
+    return $el.length ? { label, checked: $el.is(':checked') } : null;
+  }).filter(Boolean);
+  if (lengthStates.length) {
+    const enabled = lengthStates.filter(item => item.checked).map(item => item.label);
+    if (enabled.length === lengthStates.length) {
+      parts.push('freeCj:全部');
+    } else if (enabled.length) {
+      parts.push(`freeCj:${enabled.join('/')}`);
+    } else {
+      parts.push('freeCj:未選');
+    }
+  }
+
+  const defaultLimit = parseInt($('#freeCjLimitSelect').data('default-limit'), 10);
+  const limit = getWordsFreeCjLimit(Number.isFinite(defaultLimit) ? defaultLimit : 0);
+  parts.push(`字根長度:${limit > 0 ? `<=${limit}` : '不限'}`);
+
+  $('#option_status').text(parts.join(' | '));
 }
 
 // Parse custom dict: support JSON array or comma-separated words
@@ -194,8 +325,9 @@ function loadConfig() {
     const config = stored ? JSON.parse(stored) : {};
     
     // Load rimeBaseInput
-    if (config.rimeBase !== undefined) {
-      $('#rimeBaseInput').val(config.rimeBase);
+    if (config.rimeBase !== undefined && typeof RimeBaseManager !== 'undefined') {
+      RimeBaseManager.primeBase(config.rimeBase);
+      RimeBaseManager.setBase(config.rimeBase, { silent: true });
     }
     
     // Load langFilterSelect
@@ -217,13 +349,21 @@ function loadConfig() {
     if (config.freeCjSingleChar !== undefined) {
       $('#freeCjSingleCharCheckbox').prop('checked', config.freeCjSingleChar);
     }
-    
+
     if (config.freeCjWordGroup !== undefined) {
-      $('#freeCjWordGroupCheckbox').prop('checked', config.freeCjWordGroup);
+      const multiChecked = !!config.freeCjWordGroup;
+      $('#freeCj2charCheckbox, #freeCj3charCheckbox, #freeCj4charCheckbox, #freeCj5pluscharCheckbox').prop('checked', multiChecked);
     }
-    
-    if (config.freeCjLimit5 !== undefined) {
-      $('#freeCjLimit5Checkbox').prop('checked', config.freeCjLimit5);
+
+    if (config.freeCjLimit !== undefined) {
+      setWordsFreeCjLimit(config.freeCjLimit);
+    } else if (config.freeCjLimit5 !== undefined) {
+      setWordsFreeCjLimit(config.freeCjLimit5 ? 5 : 0);
+    } else {
+      const defaultLimit = parseInt($('#freeCjLimitSelect').data('default-limit'), 10);
+      if (!Number.isNaN(defaultLimit)) {
+        setWordsFreeCjLimit(defaultLimit);
+      }
     }
     
     return config;
@@ -236,13 +376,13 @@ function loadConfig() {
 function saveConfig() {
   try {
     const config = {
-      rimeBase: $('#rimeBaseInput').val(),
+      rimeBase: typeof RimeBaseManager !== 'undefined' ? RimeBaseManager.getBase() : $('#rimeBaseInput').val(),
       langFilter: $('#langFilterSelect').val(),
       encoding: $('#encodingSelect').val(),
       sortOrder: $('#sortOrderSelect').val(),
       freeCjSingleChar: $('#freeCjSingleCharCheckbox').is(':checked'),
-      freeCjWordGroup: $('#freeCjWordGroupCheckbox').is(':checked'),
-      freeCjLimit5: $('#freeCjLimit5Checkbox').is(':checked')
+      freeCjWordGroup: $('#freeCj2charCheckbox, #freeCj3charCheckbox, #freeCj4charCheckbox, #freeCj5pluscharCheckbox').filter(':checked').length > 0,
+      freeCjLimit: getWordsFreeCjLimit(parseInt($('#freeCjLimitSelect').data('default-limit'), 10) || 0)
     };
     localStorage.setItem('rovodev_words_config', JSON.stringify(config));
   } catch (e) {
@@ -264,8 +404,19 @@ $(() => {
     containerClass: 'words-char-options'
   });
   
+  if (typeof FreeCjLimitSelector !== 'undefined') {
+    const defaultLimit = parseInt($('#freeCjLimitSelect').data('default-limit'), 10);
+    wordsFreeCjLimitCtrl = FreeCjLimitSelector.bind('#freeCjLimitSelect', {
+      defaultValue: Number.isFinite(defaultLimit) ? defaultLimit : 0
+    });
+  } else {
+    wordsFreeCjLimitCtrl = null;
+  }
+  
   // Load configuration from localStorage
   loadConfig();
+  renderOptionStatus();
+  $('#freeCjLimit5Checkbox').prop('checked', getWordsFreeCjLimit(parseInt($('#freeCjLimitSelect').data('default-limit'), 10) || 0) >= 5);
   
   // Highlight correct textarea based on source select
   function updateSourceHighlight() {
@@ -282,13 +433,41 @@ $(() => {
   updateSourceHighlight(); // Initial call
 
   // Bind config change events to save to localStorage
-  $('#rimeBaseInput').on('input change', saveConfig);
-  $('#langFilterSelect').on('change', saveConfig);
-  $('#encodingSelect').on('change', saveConfig);
-  $('#sortOrderSelect').on('change', saveConfig);
-  $('#freeCjSingleCharCheckbox').on('change', saveConfig);
-  $('#freeCjWordGroupCheckbox').on('change', saveConfig);
-  $('#freeCjLimit5Checkbox').on('change', saveConfig);
+  if (typeof RimeBaseManager !== 'undefined') {
+    RimeBaseManager.bindInput('#rimeBaseInput', {
+      onChange: () => {
+        renderOptionStatus();
+        saveConfig();
+      }
+    });
+  } else {
+    if (typeof RimeBaseManager !== 'undefined') {
+    RimeBaseManager.bindInput('#rimeBaseInput', {
+      onChange: () => {
+        renderOptionStatus();
+        saveConfig();
+      }
+    });
+  } else {
+    $('#rimeBaseInput').on('input change', () => { saveConfig(); renderOptionStatus(); });
+  }
+  }
+  $('#langFilterSelect').on('change', () => { saveConfig(); renderOptionStatus(); });
+  $('#encodingSelect').on('change', () => { saveConfig(); renderOptionStatus(); });
+  $('#sortOrderSelect').on('change', () => { saveConfig(); renderOptionStatus(); });
+  $('#freeCjLimitSelect').on('change', () => {
+    saveConfig();
+    renderOptionStatus();
+    const currentLimit = getWordsFreeCjLimit(parseInt($('#freeCjLimitSelect').data('default-limit'), 10) || 0);
+    $('#freeCjLimit5Checkbox').prop('checked', Number.isFinite(currentLimit) && currentLimit >= 5);
+  });
+  $('#freeCjLimit5Checkbox').on('change', function() {
+    const checked = $(this).is(':checked');
+    const target = checked ? 5 : 0;
+    setWordsFreeCjLimit(target);
+    saveConfig();
+    renderOptionStatus();
+  });
 
   // 斷詞
   $('#jiebaBtn').on('click', () => {
@@ -325,7 +504,7 @@ $(() => {
 
   // Pime 轉 Rime 格式 = 字根後置
   $('#PimeBtn').on('click', () => {
-    const base = parseInt($('#rimeBaseInput').val()) || 3; // 讀取基數輸入框的值
+    const base = parseInt($('#rimeBaseInput').val()) || 3;
     const src = getSourceText();
     setOutput( (src || '')
       .replace(/^([a-z]+) (\S+)/g,'$2\t$1\t'+base)
@@ -333,14 +512,72 @@ $(() => {
     );
   });
 
-  // Rime 格式 = 字 字 次
-  $('#RimeBtn').on('click', () => {
-    const txt = prepare('dedup'); // 所有非中文、非英文 的字元
-    const base = parseInt($('#rimeBaseInput').val()) || 3; // 讀取基數輸入框的值，預設為3
-    if (txt && checkJieba()) {
-      call_jieba_cut(txt, res => setOutput(toRime(res.join('\n'), base),'rime'));
-    } else setOutput(toRime(txt, base),'rime');
+  // Rime 格式輸出：詞\t碼\t頻
+  $('#RimeBtn').on('click', async () => {
+    renderOptionStatus();
+    const base = getRimeBase();
+    try {
+      const { payload, total, base: normalizedBase } = normalizeRimeEntries(base);
+      if (!total || !payload) {
+        setOutput('', 'rime');
+        setResultStatus('沒有可輸出的詞條', 'warning');
+        return;
+      }
+
+      const { lines } = await createRimeLines(payload, normalizedBase, total);
+      if (!lines.length) {
+        setOutput('', 'rime');
+        setResultStatus('倉頡碼尚未就緒或無法為詞條配碼', 'warning');
+        return;
+      }
+
+      setOutput(lines.join('\n'), 'rime');
+      const missing = Math.max(total - lines.length, 0);
+      if (missing) {
+        setResultStatus(`Rime 輸出完成：${lines.length} 筆，略過 ${missing} 筆無碼詞條`, 'warning');
+      } else {
+        const statusMessage = normalizedBase > 0
+          ? `Rime 輸出完成，共 ${lines.length} 筆條目`
+          : `Rime 輸出完成 (不計數)，共 ${lines.length} 筆條目`;
+        setResultStatus(statusMessage, 'success');
+      }
+    } catch (error) {
+      console.error('[words] Rime export failed', error);
+      setResultStatus('Rime 輸出失敗，請稍後再試。', 'error', 0);
+    }
   });
+  $('#toDictMakerBtn').on('click', () => {
+    const text = $('#inputTextarea').val() || '';
+    const trimmed = text.trim();
+    const statusEl = $('#excuted_result');
+    const storageKey = window.WORDS_TO_DICTMAKER_KEY || 'words_to_dictMaker_payload';
+    try {
+      if (trimmed) {
+        console.log('[words] store transfer payload');
+        const payload = { ts: Date.now(), text };
+        localStorage.setItem(storageKey, JSON.stringify(payload));
+        statusEl.text('已傳送至字典整理器').css('color', '');
+      } else {
+        console.log('[words] clear transfer payload');
+        localStorage.removeItem(storageKey);
+        statusEl.text('輸入為空，未送出').css('color', 'red');
+        return;
+      }
+    } catch (e) {
+      console.warn('寫入字典整理資料失敗:', e);
+      statusEl.text('無法存入瀏覽器，請手動複製').css('color', 'red');
+    }
+    const win = window.open('dictMaker.html', 'dictMaker');
+    console.log('[words] open dictMaker window', !!win);
+    if (!win) {
+      window.location.href = 'dictMaker.html';
+      return;
+    }
+    if (typeof win.focus === 'function') {
+      win.focus();
+    }
+  });
+
 
   // freeCj（快倉編碼），流程：
   // 1) prepare() 過濾雜訊
@@ -348,10 +585,14 @@ $(() => {
   // 3) 使用共用的 cjMakeFromText(processedText, 'fcj', opts) 取得快倉編碼
   // freeCj checkbox 驗證和警告
   $('#freeCjBtn').on('click', async () => {
-    // 驗證 checkbox 狀態
+    renderOptionStatus();
+    // 檢查 checkbox 狀態
     if (!validateFreeCjCheckboxes()) {
       return;
     }
+
+    const defaultLimitAttr = parseInt($('#freeCjLimitSelect').data('default-limit'), 10);
+    const freeCjLimit = getWordsFreeCjLimit(Number.isFinite(defaultLimitAttr) ? defaultLimitAttr : 0);
 
     let processed = prepare('dedup');
     // 若 jieba 可用先斷詞
@@ -360,36 +601,47 @@ $(() => {
         call_jieba_cut(processed, tokens => resolve(tokens.join('\n')));
       });
     }
-    processed = await doFreeCj(processed, 'fcj', { append3AtEnd:true });
+    processed = await doFreeCj(processed, 'fcj', { append3AtEnd:true, freeCjMaxLength: freeCjLimit });
     processed = processed.replace(/(.+) ([a-z]+)/g,'$2 $1');
 
-    // 檢查是否勾選「限5碼」選項
-    if ($('#freeCjLimit5Checkbox').is(':checked')) {
-      processed = processed.replace(/^([a-z]{5})[a-z]+/gm, '$1');
+    // 套用字根長度限制
+    if (freeCjLimit > 0) {
+      const limitRegex = new RegExp(`^([a-z]{${freeCjLimit}})[a-z]+`, 'gm');
+      processed = processed.replace(limitRegex, '$1');
     }
 
-    // 根據單字/詞組選項過濾結果
-    const includeSingleChar = $('#freeCjSingleCharCheckbox').is(':checked');
-    const includeWordGroup = $('#freeCjWordGroupCheckbox').is(':checked');
+    // 依據單字/詞組選項篩除
+    // 依據各字數選項篩除
+    const lengthStates = new Map([
+      [1, $('#freeCjSingleCharCheckbox').is(':checked')],
+      [2, $('#freeCj2charCheckbox').is(':checked')],
+      [3, $('#freeCj3charCheckbox').is(':checked')],
+      [4, $('#freeCj4charCheckbox').is(':checked')]
+    ]);
+    const length5Plus = $('#freeCj5pluscharCheckbox').is(':checked');
+    const allLengthsEnabled = Array.from(lengthStates.values()).every(Boolean) && length5Plus;
 
-    if (!includeSingleChar || !includeWordGroup) {
+    if (!allLengthsEnabled) {
       processed = processed.split('\n')
         .filter(line => {
           const match = line.match(/^[a-z]+ (.+)$/);
-          if (!match) return true; // 保留格式不符的行
+          if (!match) return true; // 非既定格式保留
 
           const chineseText = match[1];
-          const isSingleChar = chineseText.length === 1;
+          const len = chineseText.length;
 
-          if (isSingleChar && !includeSingleChar) return false;
-          if (!isSingleChar && !includeWordGroup) return false;
+          if (len >= 5) return length5Plus;
+          if (lengthStates.has(len)) return lengthStates.get(len);
 
-          return true;
+          // 未對應字數，預設遵循 5+ 選項
+          return length5Plus;
         })
         .join('\n');
     }
 
     setOutput(processed, 'freeCj');
+    const entryCount = processed ? processed.split(/\n/).filter(Boolean).length : 0;
+    setResultStatus(`freeCj 輸出完成：${entryCount} 筆`, 'success');
   });
 
   // 提供 doFreeCj，維持相容需求（可直接呼叫）
@@ -403,16 +655,23 @@ $(() => {
   
   // words.html 的字數過濾邏輯（基於現有的 checkbox）
   function getWordsCharLengthFilter() {
-    const checkBox = (id) => {
-      const $el = $(id);
-      return $el.length ? $el.is(':checked') : true; // 沒有UI時預設不受限
+    const resolveFlag = (selector, fallback = true) => {
+      const $el = $(selector);
+      return $el.length ? $el.is(':checked') : fallback;
     };
-    
-    const includeSingleChar = checkBox('#freeCjSingleCharCheckbox');
-    const includeWordGroup = checkBox('#freeCjWordGroupCheckbox');
-    
+
+    const lengthStates = new Map([
+      [1, resolveFlag('#freeCjSingleCharCheckbox')],
+      [2, resolveFlag('#freeCj2charCheckbox')],
+      [3, resolveFlag('#freeCj3charCheckbox')],
+      [4, resolveFlag('#freeCj4charCheckbox')]
+    ]);
+    const length5Plus = resolveFlag('#freeCj5pluscharCheckbox');
+
     return function(charLength) {
-      return charLength === 1 ? includeSingleChar : includeWordGroup;
+      if (charLength >= 5) return length5Plus;
+      if (lengthStates.has(charLength)) return lengthStates.get(charLength);
+      return length5Plus;
     };
   }
   
@@ -425,9 +684,9 @@ $(() => {
       '#freeCj4charCheckbox',
       '#freeCj5pluscharCheckbox'
     ].some(id => $(id).is(':checked'));
-    
+
     if (!hasAnyChecked) {
-      FcjUtils.updateOptionStatus('警告：至少要選擇一個字數選項', 'error');
+      setResultStatus('警告：至少要選擇一個字數選項', 'error', 0);
       return false;
     }
     return true;
@@ -437,9 +696,13 @@ $(() => {
     if (!validateFreeCjCheckboxes()) {
       // 復原操作
       $(this).prop('checked', true);
+      renderOptionStatus();
+      saveConfig();
       return;
     }
     // 驗證通過後，觸發配置保存
+    renderOptionStatus();
+    saveConfig();
   });
 
   // 簡易斷句 - 根據下拉選單決定過濾規則
