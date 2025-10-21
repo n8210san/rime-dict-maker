@@ -45,12 +45,16 @@
         <button id="jiebaCustomBtn"> 自訂斷詞 </button>
         <button id="PimeBtn"> 字根後置 (Pime 轉 Rime)</button>
         <button id="RimeBtn"> Rime 格式 {字 字 次} </button>
+        <button id="toDictMakerBtn"> 轉字典整理器 </button>
         <input type="number" id="rimeBaseInput" value="3" min="1" max="9999" style="width: 60px; height:40px; margin-left: 8px;" title="基數">
         <button id="freeCjBtn"> freeCj 格式 </button>
-        <span id="wordsCharOptions" style="margin-left: 8px;">輸出詞組字數：</span>
-        <label style="margin-left: 8px;" title="輸出限最多5碼字根 (for PIME快倉)">
-          <input type="checkbox" id="freeCjLimit5Checkbox" checked> 限5碼
+        <label style="margin-left: 8px;" title="限制快倉字根碼長度 (for PIME匯入)">
+          <select id="freeCjLimitSelect" data-default-limit="5" style="margin-left:4px; height:36px;"></select>
         </label>
+        <label style="margin-left: 8px;" title="限制輸出字根為 5 碼">
+          <input type="checkbox" id="freeCjLimit5Checkbox"> 限5碼
+        </label>
+        <span id="wordsCharOptions" style="margin-left:8px;"></span>
         <button id="nextStepBtn">←輸出轉輸入</button>
         <button id="swapBtn" style="display:none">←互換→</button>
         
@@ -93,6 +97,12 @@
 <script src="scripts/utils.js"></script>
 <script src="scripts/extracted_features.js"></script>
 <script src="scripts/rangeFilter.js"></script>
+<script src="html-lib/components/FreeCjLimitSelector/FreeCjLimitSelector.js"></script>
+<script src="scripts/modules/prefs.js"></script>
+<script src="scripts/modules/uiHelpers.js"></script>
+<script src="scripts/modules/fileOps.js"></script>
+<script src="scripts/modules/buttonManager.js"></script>
+<script src="scripts/modules/dictCore.js"></script>
 <script src="scripts/dictMaker.js"></script>
 <script src="scripts/legacy_compatibility.js"></script>
 <!--
@@ -123,3 +133,4 @@ words.js
 
 </body>
 </html>
+

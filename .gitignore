@@ -2,6 +2,7 @@
 docs/*.dot
 docs/*_summary.md
 *_backup*
+*backup_*
 test_*
 temp_*
 tmp_*
@@ -16,6 +17,14 @@ tmp_*
 .gemini/
 .rovodev/
 *AGENTS.md
+00_START_HERE.md
+config/agent_config.json
+docs/todo/RECENT_WORK.md
+docs/AGENT_RED_LINES.md
+docs/AGENT_WORKFLOW_SOP.md
+docs/TECHNICAL_DEBT_RESOLUTION.md
+docs/WARMUP_FLOW_GUIDE.md
+docs/FEATURE_FORMAT_OPTIONS.md
 
 ---
 

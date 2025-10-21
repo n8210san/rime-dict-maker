@@ -31,7 +31,7 @@
     ]
   },
   "freeCj": {
-    "limit5Chars": true,
+    "limitChars": 5,
     "includeSingleChar": true,
     "includeWordGroup": true
   },

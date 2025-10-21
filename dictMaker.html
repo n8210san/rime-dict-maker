@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>字典整理器</title>
+  <title>📙字典整理器</title>
   <link rel="stylesheet" href="words.css" />
 </head>
 <body>
-    <h2>字典整理器</h2>
+    <h2>📙字典整理器</h2>
     <small>
       <hr>排序字典檔 => 快倉 => dict_max2_fcj.txt
       <hr><a href="words.html" target="word">斷詞整理器</a><hr>
@@ -32,12 +32,33 @@
         <button id="normalizeBtn">補完整字典</button>
         <button id="quickBtn">速成</button>
         <button id="fcjBtn">快倉</button>
-        <label title="在輸出時加上原始計數" style="margin-left:8px; font-size:13px;"><input type="checkbox" id="countOpt"> 計數</label>
+        <label title="選擇輸出格式" style="margin-left:8px; font-size:13px;">格式:
+          <select id="formatOpt" style="margin-left:4px;">
+            <option value="" selected>(選擇後套用)</option>
+            <option value="Rime">Rime 字根在後 不限碼 tab分隔 詞頻計數</option>
+            <option value="Pime">Pime 字根在前 限5碼 空格分隔 不計數</option>
+          </select>
+        </label>
+        <label title="選擇字根輸出位置" style="margin-left:8px; font-size:13px;">字根順序:
+          <select id="rootOrderOpt" style="margin-left:4px; height:34px;">
+            <option value="" selected>(請選擇)</option>
+            <option value="after">字根在後</option>
+            <option value="before">字根在前</option>
+          </select>
+        </label>
+        <label style="margin-left: 8px;" title="限制快倉字根碼長度 (for PIME 匯入)">
+          <select id="freeCjLimitSelect" data-default-limit="5" style="margin-left:4px; height:36px;"></select>
+        </label>
         <label title="選擇分隔符" style="margin-left:8px; font-size:13px;">分隔符:
           <select id="separatorOpt" style="margin-left:4px;">
-            <option value="\t">tab</option>
+            <option value="	">tab</option>
             <option value=" ">空格</option>
           </select>
+        </label>
+        <label title="設定輸出計數基數 (0 表示不計數)" style="margin-left:8px; font-size:13px;">
+          <input type="checkbox" id="countOpt" style="display:none">
+          計數基數
+          <input type="number" id="rimeBaseInput" value="3" min="0" max="9999" style="width: 64px; height:36px; margin-left:4px;" title="計數基數">
         </label>
         <span id="dictMakerCharOptions" style="margin-left:8px;">輸出詞組字數：</span>
         <br style="clear:both;">
@@ -79,6 +100,12 @@
 <script src="scripts/utils.js"></script>
 <script src="scripts/extracted_features.js"></script>
 <script src="scripts/rangeFilter.js"></script>
+<script src="html-lib/components/FreeCjLimitSelector/FreeCjLimitSelector.js"></script>
+<script src="scripts/modules/prefs.js"></script>
+<script src="scripts/modules/uiHelpers.js"></script>
+<script src="scripts/modules/fileOps.js"></script>
+<script src="scripts/modules/buttonManager.js"></script>
+<script src="scripts/modules/dictCore.js"></script>
 <script src="html-lib/components/CharLengthOptions/CharLengthOptions.js"></script>
 <script src="scripts/dictMaker.js"></script>
 <script src="scripts/legacy_compatibility.js"></script>

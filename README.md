@@ -1,5 +1,20 @@
 # Rime 字典製作工具集
 
+## 🚦 會話啟動（AI Agent 必讀）
+
+**所有 AI Agent 任務必須從這裡開始：**
+
+1. **第一步**：閱讀 [00_START_HERE.md](00_START_HERE.md)
+2. **第二步**：填寫 START_CONTRACT（任務契約）
+3. **第三步**：依照 Gate 流程執行（Gate 0 → Gate 1 → Gate 2 → Gate 3）
+
+> ⚠️ 未貼 START_CONTRACT 者一律 No-Go，請引導 User 回到 [00_START_HERE.md](00_START_HERE.md)
+
+---
+
+## 📚 快速索引
+- [模組映射快速索引](docs/modules_map.md)
+
 一個用於製作 Rime 輸入法字典檔案的完整工具集，包含文本斷詞、字典標準化、去重、快倉碼生成等功能。
 
 ## 🚀 快速開始
