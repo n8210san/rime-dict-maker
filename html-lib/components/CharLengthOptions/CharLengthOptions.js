@@ -45,7 +45,7 @@ const CharLengthOptions = {
 
   // 獲取字數過濾函數
   getFilter() {
-    const checkElement = (id, defaultValue = false) => {
+    const checkElement = (id, defaultValue = true) => {
       const $el = $(id);
       return $el.length ? $el.is(':checked') : defaultValue;
     };
