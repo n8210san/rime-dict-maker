@@ -9,6 +9,7 @@ tmp_*
 *_tmp.*
 *.bk
 *pycache*
+data/
 
 ---
 
@@ -54,7 +55,6 @@ secrets/
 ---
 
 # Runtime and ephemeral files  一般性排除
-data/
 **/data # 保險起見重複規定
 uploads/
 **/uploads
