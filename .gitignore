@@ -10,6 +10,7 @@ tmp_*
 *.bk
 *pycache*
 data/
+!data/cangjie5.dict.yaml
 
 ---
 

@@ -263,7 +263,6 @@ function setWordsFreeCjLimit(value) {
   }
 }
 
-$('#freeCjLimit5Checkbox').prop('checked', Number.isFinite(value) && value >= 5);
 function renderOptionStatus() {
   const parts = [];
 
