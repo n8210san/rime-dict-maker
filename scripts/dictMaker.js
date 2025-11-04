@@ -42,28 +42,26 @@ const WORDS_TO_DICTMAKER_KEY = window.WORDS_TO_DICTMAKER_KEY;
 let isSyncingDictCountOpt = false;
 
 $(function() {
-  if (!window.IS_DICTMAKER_PAGE) return;
   try {
     const stored = localStorage.getItem(WORDS_TO_DICTMAKER_KEY);
     console.log('[dictMaker] check transfer payload', stored);
     if (!stored) return;
 
     const parsed = JSON.parse(stored);
-    const text = parsed && typeof parsed.text === 'string' ? parsed.text : '';
-    if (!text.trim()) {
-      console.log('[dictMaker] payload empty after trim');
-      localStorage.removeItem(WORDS_TO_DICTMAKER_KEY);
-      return;
-    }
+    const inputText = parsed && typeof parsed.inputText === 'string' ? parsed.inputText : '';
+    const outputText = parsed && typeof parsed.outputText === 'string' ? parsed.outputText : '';
 
     const applyPayload = () => {
       if (typeof setInput === 'function') {
-        setInput(text, 'wordsTransfer');
+        setInput(inputText, 'wordsTransfer');
       } else {
         const $input = $('#inputTextarea');
-        $input.val(text);
+        $input.val(inputText);
         $input.trigger('input');
       }
+      const $output = $('#outputTextarea');
+      $output.val(outputText);
+      $output.trigger('input');
     };
 
     applyPayload();

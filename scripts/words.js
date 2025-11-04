@@ -546,22 +546,15 @@ $(() => {
     }
   });
   $('#toDictMakerBtn').on('click', () => {
-    const text = $('#inputTextarea').val() || '';
-    const trimmed = text.trim();
+    const inputText = $('#inputTextarea').val() || '';
+    const outputText = $('#outputTextarea').val() || '';
     const statusEl = $('#excuted_result');
     const storageKey = window.WORDS_TO_DICTMAKER_KEY || 'words_to_dictMaker_payload';
     try {
-      if (trimmed) {
-        console.log('[words] store transfer payload');
-        const payload = { ts: Date.now(), text };
-        localStorage.setItem(storageKey, JSON.stringify(payload));
-        statusEl.text('已傳送至字典整理器').css('color', '');
-      } else {
-        console.log('[words] clear transfer payload');
-        localStorage.removeItem(storageKey);
-        statusEl.text('輸入為空，未送出').css('color', 'red');
-        return;
-      }
+      console.log('[words] store transfer payload');
+      const payload = { ts: Date.now(), inputText, outputText };
+      localStorage.setItem(storageKey, JSON.stringify(payload));
+      statusEl.text('已傳送至字典整理器').css('color', '');
     } catch (e) {
       console.warn('寫入字典整理資料失敗:', e);
       statusEl.text('無法存入瀏覽器，請手動複製').css('color', 'red');
