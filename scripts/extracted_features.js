@@ -93,9 +93,9 @@
     }
 
     async loadCangjieDict() {
-      // 優先使用 cangjieProcessor 的實現
-      if (global.cangjieProcessor && typeof global.cangjieProcessor.loadCangjieDict === 'function') {
-        return await global.cangjieProcessor.loadCangjieDict();
+      // 優先使用 unifiedCangjie 的實現
+      if (global.unifiedCangjie && typeof global.unifiedCangjie.loadDict === 'function') {
+        return await global.unifiedCangjie.loadDict();
       }
       
       // 降級方案：直接實現（向後相容）
@@ -135,9 +135,9 @@
     }
 
     pickQuick(codeStr) {
-      // 引用 cangjieProcessor 的實現
-      if (global.cangjieProcessor && typeof global.cangjieProcessor.pickQuick === 'function') {
-        return global.cangjieProcessor.pickQuick(codeStr);
+      // 引用 unifiedCangjie 的實現
+      if (global.unifiedCangjie && typeof global.unifiedCangjie.pickQuick === 'function') {
+        return global.unifiedCangjie.pickQuick(codeStr);
       }
       // 降級實現
       const main = (codeStr.split(/\s+/)[0] || '').trim();
@@ -148,9 +148,9 @@
     }
 
     pickFCJ(codeStr) {
-      // 引用 cangjieProcessor 的實現
-      if (global.cangjieProcessor && typeof global.cangjieProcessor.pickFCJ === 'function') {
-        return global.cangjieProcessor.pickFCJ(codeStr);
+      // 引用 unifiedCangjie 的實現
+      if (global.unifiedCangjie && typeof global.unifiedCangjie.pickFCJ === 'function') {
+        return global.unifiedCangjie.pickFCJ(codeStr);
       }
       // 降級實現
       const main = (codeStr.split(/\s+/)[0] || '').trim();

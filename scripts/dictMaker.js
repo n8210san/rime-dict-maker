@@ -395,14 +395,18 @@ function nextStep() {
   }
 }
 
-// 初始化所有管理器
+  // 初始化所有管理器
 $(function() {
   // 1. 最前面初始化 PrefsManager
   if (window.PrefsManager && typeof PrefsManager.init === 'function') {
     PrefsManager.init();
   }
-  
-  // 初始化字數選項組件
+
+  // 2. 初始化 ButtonManager，綁定所有按鈕事件
+  if (window.ButtonManager && typeof ButtonManager.init === 'function') {
+    ButtonManager.init();
+  }
+    // 初始化字數選項組件
   CharLengthOptions.inject('#dictMakerCharOptions', {
     options: [
       { id: 'fcjOpt_singleChar', label: '單字', length: 1, default: true },
@@ -894,7 +898,7 @@ function dedupeWithComments_v1() {
 
 // override runMake with shared implementation
 function runMake(mode) {
-  console.log('runMake called with mode:', mode);
+  console.log('##987 runMake called with mode:', mode);
   const raw = $('#inputTextarea').val() || '';
   const append3AtEnd = (mode === 'fcj') && $('#fcjOpt_freq1000_code3_to_code2').is(':checked');
   const charLengthFilter = getCharLengthFilter();
@@ -909,10 +913,12 @@ function runMake(mode) {
   const rootOrder = $('#rootOrderOpt').val() || 'after';
   const defaultLimitAttr = parseInt($('#freeCjLimitSelect').data('default-limit'), 10);
   const freeCjLimit = getDictMakerFreeCjLimit(Number.isFinite(defaultLimitAttr) ? defaultLimitAttr : 0);
-  console.log('runMake params:', { base, baseEnabled, separator });
+  console.log('##912 runMake params:', { base, baseEnabled, separator });
 
-  const payloadInfo = transformTextForRimeBase(raw, base);
-  const payload = payloadInfo.text;
+  // const payloadInfo = transformTextForRimeBase(raw, base);
+  // const payload = payloadInfo.text;
+  // 這裡使用 payload 等於被加入計數，汙染導致 cjMakeFromText 無法作用 ==> 改回用 raw
+  const payload = raw
 
   FcjUtils.cjMakeFromText(payload, mode, {
     append3AtEnd,
